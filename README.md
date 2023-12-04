@@ -1,3 +1,9 @@
+# Spectrum Code Menu
+Wow, congrats on finding this. I guess you can look for leaks here if you want, it's not like I'm purposefully hiding much anyway.
+This is the Code Menu source for the Super Smash Bros. Spectrum modpack/build. I don't think it'll deviate much from QuickLava's base, beyond adding maybe something like the stagelist switcher. idk lol
+
+---
+Original README.md:
 # PowerPC Assembly Functions (Code Menu Building Utility)
 A fork of the P+EX code menu which implements the ability to add characters to the code menu without having to manually edit and recompile anything.
 Adding new characters along with their IDs to the provided "EX_Characters.txt" and running the program is all you need to do.
