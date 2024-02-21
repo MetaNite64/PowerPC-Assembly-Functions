@@ -66,6 +66,10 @@ extern int ALC_P1_INDEX;
 extern int ALC_P2_INDEX;
 extern int ALC_P3_INDEX;
 extern int ALC_P4_INDEX;
+extern int ALC_P1_FLASH_RED_INDEX;
+extern int ALC_P2_FLASH_RED_INDEX;
+extern int ALC_P3_FLASH_RED_INDEX;
+extern int ALC_P4_FLASH_RED_INDEX;
 extern int BIG_HEAD_INDEX;
 extern int RANDOM_ANGLE_INDEX;
 extern int WAR_MODE_INDEX;
@@ -81,17 +85,17 @@ extern int DASH_ATTACK_ITEM_GRAB_INDEX;
 extern int TRIP_TOGGLE_INDEX;
 extern int TRIP_RATE_MULTIPLIER_INDEX;
 extern int TRIP_INTERVAL_INDEX;
-extern int BACKPLATE_COLOR_1_INDEX;
-extern int BACKPLATE_COLOR_2_INDEX;
-extern int BACKPLATE_COLOR_3_INDEX;
-extern int BACKPLATE_COLOR_4_INDEX;
-extern int BACKPLATE_COLOR_C_INDEX;
-extern int BACKPLATE_COLOR_T_INDEX;
+extern int PSCC_COLOR_1_INDEX;
+extern int PSCC_COLOR_2_INDEX;
+extern int PSCC_COLOR_3_INDEX;
+extern int PSCC_COLOR_4_INDEX;
 extern int JUMPSQUAT_OVERRIDE_TOGGLE_INDEX;
 extern int JUMPSQUAT_OVERRIDE_FRAMES_INDEX;
 extern int JUMPSQUAT_OVERRIDE_MIN_INDEX;
 extern int JUMPSQUAT_OVERRIDE_MAX_INDEX;
 
+// utility
+extern int TOGGLE_BASE_LINE_INDEX;
 
 struct ConstantPair {
 	int address;
@@ -117,10 +121,6 @@ extern int SHIELD_TILT_MULTIPLIER_INDEX;
 extern int KNOCKBACK_DECAY_MULTIPLIER_INDEX;
 extern int WALL_BOUNCE_KNOCKBACK_MULTIPLIER_INDEX;
 extern int STALING_TOGGLE_INDEX;
-
-extern vector<int> Defaults;
-
-#define MAX_SUBPAGE_DEPTH 20
 
 //dpad same, + is start, 2 is A, 1 is B, A is Y, B is X, - is Z
 const vector<u8> CODE_MENU_WIIMOTE_CONVERSION_TABLE = { 2, 3, 1, 0, 12, 31, 31, 31, 8, 9, 10, 11, 4, 31, 31, 31 };
@@ -278,37 +278,82 @@ extern std::vector<menuTheme> THEME_SPEC_LIST;
 // Used to determine whether or not we actually need to output the hook for a given theme-able file.
 extern std::array<bool, themeConstants::tpi__PATH_COUNT> THEME_FILE_GOT_UNIQUE_PREFIX;
 
-namespace backplateColorConstants
+namespace pscc
 {
-	enum playerSlotColorLevel
+	struct color
 	{
-		pSCL_NONE = 0,
-		pSCL_SHIELDS_AND_PLUMES_ONLY,
-		pSCL_SHIELDS_PLUMES_AND_IN_GAME_HUD,
-		pSCL_MENUS_AND_IN_GAME_WITHOUT_CSS_INPUT,
-		pSCL_MENUS_AND_IN_GAME_WITH_CSS_INPUT,
-		pSCL__COUNT
+		float hue;
+		float saturation;
+		float luminance;
+
+		color(float hueIn = 0.0f, float satIn = 1.0f, float lumIn = 1.0f) :
+			hue(hueIn), saturation(satIn), luminance(lumIn) {};
+		bool colorValid() const;
 	};
-	extern const std::array<std::string, playerSlotColorLevel::pSCL__COUNT> modeNames;
+	extern std::map<std::string, color> colorTable;
+	static constexpr std::size_t colorTableEntrySizeInBytes = 0xC;
+	std::size_t getColorTableSizeInBytes();
+	std::size_t getColorTableOffsetToColor(std::string colorName);
+
+
+	enum schemePredefIDs
+	{
+		spi_P1 = 0,
+		spi_P2,
+		spi_P3,
+		spi_P4,
+		spi__COUNT
+	};
+	enum colorSchemeColorSlots
+	{
+		cscs_MENU1 = 0,
+		cscs_MENU2,
+		cscs_INGAME1,
+		cscs_INGAME2,
+		cscs__COUNT
+	};
+	struct colorScheme
+	{
+		std::string name;
+		std::array<std::string, cscs__COUNT> colors;
+		colorScheme(std::string nameIn = "");
+		void downfillEmptySlots();
+		bool schemeValid() const;
+	};
+	struct colorSchemeTable
+	{
+		std::vector<colorScheme> entries;
+		colorSchemeTable();
+		static constexpr std::size_t schemeTableEntrySizeInBytes = colorSchemeColorSlots::cscs__COUNT;
+		std::size_t tableSizeInBytes() const;
+		std::vector<unsigned char> tableToByteVec() const;
+	};
+	extern colorSchemeTable schemeTable;
+	
+	std::size_t getFullEmbedSizeInWords();
 }
-// Denotes the total number colors available to the HUD Color Switcher.
-// Used to ensure that if we add a mechanism for adding additional colors, they'll be accounted for, both
-// in the actual generated ASM in _BackplateColors, and by the actual code menu lines themselves.
-extern const unsigned long BACKPLATE_COLOR_TOTAL_COLOR_COUNT;
 
 // Incoming Configuration XML Variables (See "Code Menu.cpp" for defaults, and "_AdditionalCode.cpp" for relevant Config Parsing code!)
 extern std::vector<std::string> CONFIG_INCOMING_COMMENTS;
 extern bool CONFIG_DELETE_CONTROLS_COMMENTS;
-extern unsigned char CONFIG_BACKPLATE_COLOR_MODE;
+extern bool CONFIG_PSCC_ENABLED;
 extern bool CONFIG_DASH_ATTACK_ITEM_GRAB_ENABLED;
 extern bool CONFIG_JUMPSQUAT_OVERRIDE_ENABLED;
-
 
 
 // The stream for the MenuFile.
 // Path is no longer specified in this line, is instead controlled by the below paths and applied in initMenuFileStream().
 static fstream MenuFile;
 void initMenuFileStream();
+// The output bundle for logging purposes!
+struct __logOutputStruct : public lava::outputSplitter
+{
+	static constexpr unsigned long changelogID = 0x10000;
+	__logOutputStruct();
+	std::ostream* getChangelogPtr();
+};
+extern __logOutputStruct ChangelogOutput;
+
 
 
 // Logging and Input Constants
@@ -326,9 +371,8 @@ extern const std::string asmOutputFilePath;
 extern const std::string cmnuOutputFilePath;
 extern const std::string cmnuOptionsOutputFilePath;
 extern const std::string asmTextOutputFilePath;
-extern const std::string asmBuildLocationDirectory;
+extern const std::vector<std::string> asmBuildLocationDirectories;
 extern const std::string cmnuBuildLocationDirectory;
-extern const std::string asmBuildLocationFilePath;
 extern const std::string cmnuBuildLocationFilePath;
 std::string getCMNUAbsolutePath();
 // AutoGCTRM Constants
@@ -341,7 +385,6 @@ extern const std::string mainGCTTextFile;
 extern const std::string boostGCTName;
 extern const std::string boostGCTFile;
 extern const std::string boostGCTTextFile;
-
 
 
 // Options File Functions
@@ -370,214 +413,13 @@ bool loadMenuOptionsTree(std::string xmlPathIn, pugi::xml_document& destinationD
 void recursivelyFindPages(Page& currBasePageIn, std::vector<Page*>& collectedPointers);
 void findPagesInOptionsTree(const pugi::xml_document& optionsTree, std::map<std::string, pugi::xml_node>& collectedNodes);
 void findLinesInPageNode(const pugi::xml_node& pageNode, std::map<std::string, pugi::xml_node>& collectedNodes);
-std::vector<const char*> splitLineContentString(const std::string& joinedStringIn);
-void applyLineSettingsFromMenuOptionsTree(Page& mainPageIn, const pugi::xml_document& xmlDocumentIn);
-bool applyLineSettingsFromMenuOptionsTree(Page& mainPageIn, std::string xmlPathIn);
+void applyLineSettingsFromMenuOptionsTree(Page& mainPageIn, const pugi::xml_document& xmlDocumentIn, lava::outputSplitter& logOutput);
+bool applyLineSettingsFromMenuOptionsTree(Page& mainPageIn, std::string xmlPathIn, lava::outputSplitter& logOutput);
 bool buildMenuOptionsTreeFromMenu(Page& mainPageIn, std::string xmlPathOut);
+std::vector<std::string_view> splitLineContentString(const std::string& joinedStringIn);
 
 
-
-static const int START_OF_CODE_MENU_HEADER = 0x804E0000;
-static const int CURRENT_PAGE_PTR_LOC = START_OF_CODE_MENU_HEADER; //4
-static const int MAIN_PAGE_PTR_LOC = CURRENT_PAGE_PTR_LOC + 4; //4
-static const int SALTY_RUNBACK_BUTTON_COMBO_LOC = MAIN_PAGE_PTR_LOC + 4; //4
-static const int SKIP_RESULTS_BUTTON_COMBO_LOC = SALTY_RUNBACK_BUTTON_COMBO_LOC + 4; //4
-// This is deprecated, the color array has been moved to LINE_COLOR_TABLE!
-static const int OLD_COLOR_ARRAY = SKIP_RESULTS_BUTTON_COMBO_LOC + 4; // 0x14
-static const int MOVE_FRAME_TIMER_LOC = OLD_COLOR_ARRAY + 0x14; //4
-static const int INCREMENT_FRAME_TIMER_LOC = MOVE_FRAME_TIMER_LOC + 4; //4
-static const int FRAME_ADVANCE_FRAME_TIMER = INCREMENT_FRAME_TIMER_LOC + 4; //4
-
-static const int PREV_CODE_MENU_CONTROL_FLAG = FRAME_ADVANCE_FRAME_TIMER + 4; //4
-static const int CODE_MENU_CONTROL_FLAG = PREV_CODE_MENU_CONTROL_FLAG + 4; //4
-static const int INFINITE_FRIENDLIES_FLAG_LOC = CODE_MENU_CONTROL_FLAG + 4; //4
-static const int AUTO_SAVE_REPLAY_FLAG_LOC = INFINITE_FRIENDLIES_FLAG_LOC + 4; //4
-static const int ON_GROUP_RECORDS_FLAG_LOC = AUTO_SAVE_REPLAY_FLAG_LOC + 4; //4
-
-static const int CODE_MENU_BUTTON_MASK_LOC = ON_GROUP_RECORDS_FLAG_LOC + 4; //4
-static const int BUTTON_ACTIVATOR_MASK_LOC = CODE_MENU_BUTTON_MASK_LOC + 4; //4
-static const int MAIN_BUTTON_MASK_LOC = BUTTON_ACTIVATOR_MASK_LOC + 4; //4 * 8
-
-static const int OLD_DEBUG_STATE_LOC = MAIN_BUTTON_MASK_LOC + 4 * 8; //4
-static const int OLD_CAMERA_LOCK_STATE_LOC = OLD_DEBUG_STATE_LOC + 4; //4
-
-static const int OLD_CAMERA_POS_LOC = OLD_CAMERA_LOCK_STATE_LOC + 4; //4
-
-static const int SAVE_STATE_BUFFER_PTR_LOC = OLD_CAMERA_POS_LOC + 4; //4
-static const int SAVE_STATE_ARTICLE_LIST_PTR_LOC = SAVE_STATE_BUFFER_PTR_LOC + 4; //4
-static const int SAVE_STATE_ARTICLE_ID_LIST_PTR_LOC = SAVE_STATE_ARTICLE_LIST_PTR_LOC + 4; //4
-static const int SAVE_STATE_ARTICLE_SAVED_RESOURCE_LIST_PTR_LOC = SAVE_STATE_ARTICLE_ID_LIST_PTR_LOC + 4; //4
-static const int SAVE_STATE_LOCATIONS_TO_UPDATE_PTR_LOC = SAVE_STATE_ARTICLE_SAVED_RESOURCE_LIST_PTR_LOC + 4; //4
-static const int SAVE_STATE_LOCATIONS_TO_CLEAR_PTR_LOC = SAVE_STATE_LOCATIONS_TO_UPDATE_PTR_LOC + 4; //4
-static const int SAVE_STATE_SAVED_ARTICLE_LIST_PTR_LOC = SAVE_STATE_LOCATIONS_TO_CLEAR_PTR_LOC + 4; //4
-
-static const int RESET_LINES_STACK_LOC = SAVE_STATE_SAVED_ARTICLE_LIST_PTR_LOC + 4; // 4 * MAX_SUBPAGE_DEPTH + 8
-
-static const int CHARACTER_SWITCHER_ARRAY_LOC = RESET_LINES_STACK_LOC + 4 * MAX_SUBPAGE_DEPTH + 8; //0x10
-static const int INIFINITE_SHIELDS_ARRAY_LOC = CHARACTER_SWITCHER_ARRAY_LOC + 0x10; //0x10
-static const int PERCENT_SELCTION_VALUE_ARRAY_LOC = INIFINITE_SHIELDS_ARRAY_LOC + 0x10; //0x10
-static const int PERCENT_SELCTION_ACTIVATOR_ARRAY_LOC = PERCENT_SELCTION_VALUE_ARRAY_LOC + 0x10; //0x10
-static const int DISABLE_DPAD_ACTIVATOR_ARRAY_LOC = PERCENT_SELCTION_ACTIVATOR_ARRAY_LOC + 0x10; //0x10
-
-static const int ENDLESS_ROTATION_QUEUE_LOC = DISABLE_DPAD_ACTIVATOR_ARRAY_LOC + 0x10; //8
-static const int ENDLESS_ROTATION_PLACEMENT_LIST_LOC = ENDLESS_ROTATION_QUEUE_LOC + 8; //4 * 4
-static const int ENDLESS_ROTATION_COMP_FUNC_LOC = ENDLESS_ROTATION_PLACEMENT_LIST_LOC + 4 * 4; //4 * 4
-
-static const int REPLAY_NTE_DATA_BUFFER_LOC = ENDLESS_ROTATION_COMP_FUNC_LOC + 4 * 4; //0x14
-static const int REPLAY_CREATE_SECTION_BUFFER_LOC = REPLAY_NTE_DATA_BUFFER_LOC + 0x14; //8
-static const int REPLAY_CRYPTO_BUFFER_LOC = REPLAY_CREATE_SECTION_BUFFER_LOC + 8; //0x30
-
-static const int CODE_MENU_WIIMOTE_CONVERSION_TABLE_LOC = REPLAY_CRYPTO_BUFFER_LOC + 0x30; //0x10 * 3
-
-static const int P1_TAG_HEX_LOC = CODE_MENU_WIIMOTE_CONVERSION_TABLE_LOC + 0x10 * 3; //0x18
-static const int P2_TAG_HEX_LOC = P1_TAG_HEX_LOC + 0x18; //0x18
-static const int P3_TAG_HEX_LOC = P2_TAG_HEX_LOC + 0x18; //0x18
-static const int P4_TAG_HEX_LOC = P3_TAG_HEX_LOC + 0x18; //0x18
-
-static const int P1_STOP_LOAD_FLAG_PTR_LOC = P4_TAG_HEX_LOC + 0x18; //4
-static const int P2_STOP_LOAD_FLAG_PTR_LOC = P1_STOP_LOAD_FLAG_PTR_LOC + 4; //4
-static const int P3_STOP_LOAD_FLAG_PTR_LOC = P2_STOP_LOAD_FLAG_PTR_LOC + 4; //4
-static const int P4_STOP_LOAD_FLAG_PTR_LOC = P3_STOP_LOAD_FLAG_PTR_LOC + 4; //4
-
-static const int RANDOM_ALTS_RNG = P4_STOP_LOAD_FLAG_PTR_LOC + 4; //4
-static const int RANDOM_ALTS_MATCH_START_FLAG = RANDOM_ALTS_RNG + 4; //4
-
-static const int TEAM_SETTINGS_LOC = RANDOM_ALTS_MATCH_START_FLAG + 4; //4
-static const int TAG_LOAD_FLAGS_LOC = TEAM_SETTINGS_LOC + 4; //4
-
-static const int PREV_TAG_COSTUMES_SETTING_LOC = TAG_LOAD_FLAGS_LOC + 4; //4
-
-static const int DOLPHIN_MOUNT_VF_LOC = PREV_TAG_COSTUMES_SETTING_LOC + 4; //4
-
-static const int CODE_MENU_OLD_CAMERA_MATRIX_LOC = DOLPHIN_MOUNT_VF_LOC + 4; //4 * 12 = 0x30
-static const int CODE_MENU_NEED_TO_SAVE_CAMERA_MATRIX_FLAG_LOC = CODE_MENU_OLD_CAMERA_MATRIX_LOC + 0x30; //4
-
-static const int SHOULD_DISPLAY_HUD_FLAG_LOC = CODE_MENU_NEED_TO_SAVE_CAMERA_MATRIX_FLAG_LOC + 4; //4
-
-static const int SHOULD_RESET_HITBOX_DISPLAY_FLAG_LOC = SHOULD_DISPLAY_HUD_FLAG_LOC + 4; //4
-static const int SHOULD_RESET_STAGE_COLLISIONS_FLAG_LOC = SHOULD_RESET_HITBOX_DISPLAY_FLAG_LOC + 4; //4
-
-static const int ALC_P1_LOC = SHOULD_RESET_STAGE_COLLISIONS_FLAG_LOC + 4; //4
-static const int ALC_P2_LOC = ALC_P1_LOC + 4; //4
-static const int ALC_P3_LOC = ALC_P2_LOC + 4; //4
-static const int ALC_P4_LOC = ALC_P3_LOC + 4; //4
-
-static const int BIG_HEAD_LOC = ALC_P4_LOC + 4; //4
-
-static const int RANDOM_ANGLE_LOC = BIG_HEAD_LOC + 4; //4
-
-static const int WAR_MODE_LOC = RANDOM_ANGLE_LOC + 4; //4
-
-static const int BUFFER_P1_LOC = WAR_MODE_LOC + 4; //4
-static const int BUFFER_P2_LOC = BUFFER_P1_LOC + 4; //4
-static const int BUFFER_P3_LOC = BUFFER_P2_LOC + 4; //4
-static const int BUFFER_P4_LOC = BUFFER_P3_LOC + 4; //4
-
-static const int SCALE_LOC = BUFFER_P4_LOC + 4; //4
-
-static const int SPEED_LOC = SCALE_LOC + 4; //4
-
-static const int CSS_VER_LOC = SPEED_LOC + 4; //4
-
-static const int THEME_LOC = CSS_VER_LOC + 4; //4
-
-static const int DASH_ATTACK_ITEM_GRAB_LOC = THEME_LOC + 4; //4
-
-static const int TRIP_TOGGLE_LOC = DASH_ATTACK_ITEM_GRAB_LOC + 4; //4
-static const int TRIP_RATE_MULTIPLIER_LOC = TRIP_TOGGLE_LOC + 4; //4
-static const int TRIP_INTERVAL_LOC = TRIP_RATE_MULTIPLIER_LOC + 4; //4
-
-static const int BACKPLATE_COLOR_1_LOC = TRIP_INTERVAL_LOC + 4; //4
-static const int BACKPLATE_COLOR_2_LOC = BACKPLATE_COLOR_1_LOC + 4; //4
-static const int BACKPLATE_COLOR_3_LOC = BACKPLATE_COLOR_2_LOC + 4; //4
-static const int BACKPLATE_COLOR_4_LOC = BACKPLATE_COLOR_3_LOC + 4; //4
-static const int BACKPLATE_COLOR_C_LOC = BACKPLATE_COLOR_4_LOC + 4; //4
-static const int BACKPLATE_COLOR_T_LOC = BACKPLATE_COLOR_C_LOC + 4; //4
-static const int BACKPLATE_COLOR_TEAM_BATTLE_STORE_LOC = BACKPLATE_COLOR_T_LOC + 4; //4
-
-static const int JUMPSQUAT_OVERRIDE_TOGGLE_LOC = BACKPLATE_COLOR_TEAM_BATTLE_STORE_LOC + 4; // 4
-static const int JUMPSQUAT_OVERRIDE_FRAMES_LOC = JUMPSQUAT_OVERRIDE_TOGGLE_LOC + 4; // 4
-static const int JUMPSQUAT_OVERRIDE_MIN_LOC = JUMPSQUAT_OVERRIDE_FRAMES_LOC + 4; // 4
-static const int JUMPSQUAT_OVERRIDE_MAX_LOC = JUMPSQUAT_OVERRIDE_MIN_LOC + 4; // 4
-
-static const int DRAW_SETTINGS_BUFFER_LOC = JUMPSQUAT_OVERRIDE_MAX_LOC + 4; //0x200
-
-// HOOK Vtable
-// Provides a table to store HOOKS in, allowing them to be called repeatedly from different locations!
-// Registering a HOOK:
-//		1) Add a new entry to the struct, then open a HOOK using ASMStart(), passing your entry as the "BranchAddress" argument.
-//		2) Write the meat of your hook, **ENSURING THAT YOU END YOUR HOOK WITH A BLR INSTRUCTION**. This is how you'll get back afterwards!
-//		3) Close the hook using ASMEnd().
-// Calling a Registered HOOK from Your Own:
-//		0) If necessary, backup the Link Register's current value (along with any other registers you need to keep) to the stack.
-//		1) Call SetRegister(), passing your entry as the "value" argument.
-//		2) Use MCTR to load the address into the Count Register.
-//		3) Use BCTRL to branch and link to that address, from which you'll be branched into the body of the targeted HOOK. The BLR instruction
-//			at the end of that HOOK's body should then send you back to where you originally BCTRL'd from, allowing execution to continue from there!
-//		4) Pull any registers you backed up back off of the stack.
-static struct
-{
-	constexpr unsigned int table_start() { return DRAW_SETTINGS_BUFFER_LOC + 0x200; };
-
-	//const int THEME_CHANGE_APPLY_PREFIXES = table_start();
-
-	constexpr unsigned int table_size() { return (sizeof(*this) > 1) ? (sizeof(*this)) : 0; };
-	constexpr unsigned int table_end() { return table_start() + table_size(); };
-} HOOK_VTABLE;
-
-// Line Color Expansion
-static struct
-{
-	constexpr unsigned int table_start() { return HOOK_VTABLE.table_end(); };
-
-	enum COLORS
-	{
-		COLOR_WHITE,
-		COLOR_YELLOW,
-		COLOR_TEAL,
-		COLOR_BLUE,
-		COLOR_GREEN,
-		COLOR_RED,
-		COLOR_ORANGE,
-		COLOR_PURPLE,
-		COLOR_PINK,
-		COLOR_GRAY, 
-		COLOR_LIGHT_GRAY, 
-		COLOR_BLACK, 
-		COLOR_COUNT
-	};
-	const unsigned int COLORS[COLOR_COUNT] = { 
-		WHITE,		// WHITE
-		YELLOW,		// YELLOW
-		TEAL,		// TEAL
-		BLUE,		// BLUE
-		GREEN,		// GREEN
-		RED,		// RED
-		ORANGE,		// ORANGE
-		PURPLE,		// PURPLE
-		0xFF60C0FF,	// PINK
-		0xFFFFFF80,	// GRAY
-		0xFFFFFFB0,	// LIGHT GRAY
-		BLACK,		// BLACK
-	};
-
-	constexpr unsigned int table_size() { return (sizeof(*this) > 1) ? (sizeof(*this)) : 0; };
-	constexpr unsigned int table_end() { return table_start() + table_size(); };
-
-	constexpr unsigned int offset(enum COLORS colorIn) { return colorIn * 4; };
-
-} LINE_COLOR_TABLE;
-static const u8 NORMAL_LINE_COLOR_OFFSET = LINE_COLOR_TABLE.offset(LINE_COLOR_TABLE.COLOR_WHITE);
-static const u8 HIGHLIGHTED_LINE_COLOR_OFFSET = LINE_COLOR_TABLE.offset(LINE_COLOR_TABLE.COLOR_YELLOW);
-static const u8 CHANGED_LINE_COLOR_OFFSET = LINE_COLOR_TABLE.offset(LINE_COLOR_TABLE.COLOR_TEAL);
-static const u8 CHANGED_AND_HIGHLIGHTED_LINE_COLOR_OFFSET = LINE_COLOR_TABLE.offset(LINE_COLOR_TABLE.COLOR_BLUE);
-static const u8 COMMENT_LINE_COLOR_OFFSET = LINE_COLOR_TABLE.offset(LINE_COLOR_TABLE.COLOR_GREEN);
-static const u8 UNSELECTABLE_LINE_COLOR_OFFSET = LINE_COLOR_TABLE.offset(LINE_COLOR_TABLE.COLOR_LIGHT_GRAY);
-
-
-static const int START_OF_CODE_MENU = LINE_COLOR_TABLE.table_end();
-
-
+static const int START_OF_CODE_MENU = END_OF_CODE_MENU_HEADER;
 static int CurrentOffset = START_OF_CODE_MENU;
 
 #define CODE_MENU_GECKO_IF(MenuIndex) if(MenuIndex != -1) {\
@@ -633,21 +475,36 @@ static int CurrentOffset = START_OF_CODE_MENU;
 #define FRAMES_UNTIL_SLOW_MOTION 12
 #define FRAMES_WAITED_DURING_SLOW_MOTION 3
 
-static vector<int> Defaults;
-
-
-
 class Page;
 
 class Line
 {
-	bool isSelectable = 1;
 public:
+	enum LineBehaviorFlags
+	{
+		lbf_UNSELECTABLE = 0,
+		lbf_HIDDEN,
+		lbf_STICKY,
+		lbf_REMOVED,
+		lbf__COUNT
+	};
+	struct LineBehaviorFlagSetting
+	{
+		bool forceXMLOutput = 0;
+		bool value = 0;
+		operator bool() const
+		{
+			return value;
+		}
+	};
+	std::array<LineBehaviorFlagSetting, LineBehaviorFlags::lbf__COUNT> behaviorFlags{};
+
 	// Note: The top 4 bits of the Flags Byte are line-specific flags, bottom 4 are line-agnostic flags (see Line::LINE_FLAGS_FIELDS enum)!
 	enum LINE_FLAGS_FIELDS
 	{
 		// Makes line immune to being reset to its default value!
-		LINE_FLAG_IGNORE_INDIRECT_RESET = 0b00000001
+		LINE_FLAG_IGNORE_INDIRECT_RESET = 0b00000001,
+		LINE_FLAG_SKIP_PRINTING         = 0b00000010
 	};
 
 	Line() {}
@@ -663,19 +520,39 @@ public:
 
 		Padding = (4 - Size % 4) % 4;
 		Size += Padding;
+
+		std::string_view baseString = splitLineContentString(this->Text)[0];
+		this->LineName = baseString.substr(0, baseString.find(":"));
 	}
 
 	virtual void WriteLineData()
 	{
-		WriteLineData({});
+		WriteLineData(nullptr, {});
 	}
 
-	void WriteLineData(vector<u8> SelectionOffsets)
+	void WriteLineData(int* SourceSelectionIndexPtr, vector<u8> SelectionOffsets)
 	{
+		if (behaviorFlags[Line::lbf_REMOVED]) return; // If the line is explicitly marked as removed, skip it!
+
+		if (behaviorFlags[Line::lbf_UNSELECTABLE])
+		{
+			Color = UNSELECTABLE_LINE_COLOR_OFFSET;
+		}
+		Flags &= ~Line::LINE_FLAG_SKIP_PRINTING;
+		if (behaviorFlags[Line::lbf_HIDDEN])
+		{
+			Flags |= Line::LINE_FLAG_SKIP_PRINTING;
+		}
+		Flags &= ~Line::LINE_FLAG_IGNORE_INDIRECT_RESET;
+		if (behaviorFlags[Line::lbf_STICKY])
+		{
+			Flags |= Line::LINE_FLAG_IGNORE_INDIRECT_RESET;
+		}
+
 		vector<u8> output;
 		AddValueToByteArray(Size, output);
 		if (Size == 0) {
-			cout << Text << endl;
+			std::cout << Text << endl;
 		}
 		AddValueToByteArray(type, output);
 		AddValueToByteArray(Flags, output);
@@ -703,7 +580,11 @@ public:
 			}
 		}
 		copy(output.begin(), output.end(), ostreambuf_iterator<char>(MenuFile));
-		copy(SelectionOffsets.begin(), SelectionOffsets.end(), ostreambuf_iterator<char>(MenuFile));
+		if (type == SELECTION_LINE)
+		{
+			lava::writeRawDataToStream<int>(MenuFile, *SourceSelectionIndexPtr);
+			copy(SelectionOffsets.begin(), SelectionOffsets.end(), ostreambuf_iterator<char>(MenuFile));
+		}
 		MenuFile << Text;
 		WritePadding();
 	}
@@ -729,14 +610,16 @@ public:
 	// Note: The top 4 bits of the Flags Byte are line-specific flags, bottom 4 are line-agnostic flags (see Line::LINE_FLAGS_FIELDS enum)!
 	u8 Flags = 0;
 	u16 TextOffset;
-	u16 DownOffset;
-	u16 UpOffset;
+	u16 DownOffset = 0;
+	u16 UpOffset = 0;
 	string Text;
 	u16 Size;
 	u8 lineNum;
 	int Padding;
 	vector<int*> args;
 
+	// Truncated version of the Text field. Just everything before the first colon (":") in the first delimited string.
+	std::string LineName = "";
 
 	//offsets
 	static const int SIZE = 0; //2
@@ -756,20 +639,11 @@ public:
 	static const int SUB_MENU_LINE_TEXT_START = SUB_MENU + 2;
 	static const int DEFAULT = DOWN + 2; //4
 	static const int MAX = DEFAULT + 4; //4
-	static const int SELECTION_LINE_OFFSETS_START = MAX + 4;
+	static const int SELECTION_LINE_SOURCE_SELECTION_INDEX = MAX + 4; // 0x4
+	static const int SELECTION_LINE_OFFSETS_START = SELECTION_LINE_SOURCE_SELECTION_INDEX + 4; // 0x4
 	static const int MIN = MAX + 4; //4
 	static const int SPEED = MIN + 4; //4
 	static const int NUMBER_LINE_TEXT_START = SPEED + 4;
-
-	bool getIsSelectable() const
-	{
-		return isSelectable;
-	}
-	void setIsSelectable(bool selectableIn)
-	{
-		isSelectable = selectableIn;
-		Flags = (Flags & ~LINE_FLAGS_FIELDS::LINE_FLAG_IGNORE_INDIRECT_RESET) | (selectableIn ? 0 : LINE_FLAGS_FIELDS::LINE_FLAG_IGNORE_INDIRECT_RESET);
-	}
 };
 
 class Comment : public Line
@@ -802,7 +676,7 @@ public:
 		Line::WriteLineData();
 		for (auto x : argValues) {
 			sprintf(OpHexBuffer, "%08X", x);
-			cout << Text << ": " << OpHexBuffer << endl;
+			//cout << Text << ": " << OpHexBuffer << endl;
 			x = _byteswap_ulong(x);
 			
 			MenuFile.write((const char*)& x, 4);
@@ -834,9 +708,8 @@ public:
 		}
 		Value = Default;
 		this->Default = Default;
-		Defaults.push_back(Default);
-		Defaults.push_back(Values[Default]);
 		this->Max = Options.size() - 1;
+		this->SourceSelectionIndexPtr = this->Index;
 	}
 
 	Selection(string Text, vector<string> Options, int Default, int &Index)
@@ -867,17 +740,39 @@ public:
 
 	void WriteLineData()
 	{
-		Line::WriteLineData(OptionOffsets);
+		Line::WriteLineData(SourceSelectionIndexPtr, OptionOffsets);
 	}
 
+	int* SourceSelectionIndexPtr = nullptr;
 	vector<u8> OptionOffsets;
+};
+
+class SelectionMirror : public Selection
+{
+public:
+	SelectionMirror(Selection& SourceSelection, std::string Text, int Default, int& Index, bool inheritFlags = 1) 
+		: Selection(Text, {}, {}, Default, Index)
+	{
+		this->Min = SourceSelection.Min;
+		this->Max = SourceSelection.Max;
+		this->SourceSelectionIndexPtr = SourceSelection.Index;
+		if (inheritFlags)
+		{
+			this->behaviorFlags = SourceSelection.behaviorFlags;
+		}
+	}
 };
 
 class Toggle : public Selection
 {
 public:
 	Toggle(string Text, bool Default, int &Index)
-		: Selection(Text,  { "OFF", "ON" }, Default, Index) {}
+		: Selection(Text, {}, {}, Default, Index)
+	{
+		this->Min = 0;
+		this->Max = 1;
+		this->SourceSelectionIndexPtr = &TOGGLE_BASE_LINE_INDEX;
+	}
 };
 
 class SubMenu : public Line
@@ -907,7 +802,6 @@ public:
 		this->Max = Max;
 		Value = Default;
 		this->Default = Default;
-		Defaults.push_back(Default);
 		this->Speed = Speed;
 	}
 };
@@ -922,7 +816,6 @@ public:
 		this->Max = GetHexFromFloat(Max);
 		Value = GetHexFromFloat(Default);
 		this->Default = GetHexFromFloat(Default);
-		Defaults.push_back(GetHexFromFloat(Default));
 		this->Speed = GetHexFromFloat(Speed);
 	}
 };
@@ -948,19 +841,37 @@ public:
 	Page(string Name, vector<Line*> Lines) {
 		CalledFromLine = SubMenu(Name, this);
 		PageName = Name;
-		this->Lines = Lines;
+		PrepareLines(Lines);
+	}
+	void PrepareLines()
+	{
+		PrepareLines(this->Lines);
+	}
+	void PrepareLines(const std::vector<Line*> LinesIn)
+	{
+		// Reset page size, will be re-tallied in the following loop.
 		Size = NUM_WORD_ELEMS * 4;
-		for (auto x : Lines) {
-			x->PageOffset = Size;
-			Size += x->Size;
+		this->Lines = LinesIn;
+		std::size_t excludedLines = 0;
+		// Do some final line attribute assignment stuff...
+		for (std::size_t i = 0; i < this->Lines.size(); i++)
+		{
+			// If the line is explicitly marked as removed...
+			if (this->Lines[i]->behaviorFlags[Line::lbf_REMOVED])
+			{
+				// ... increment the counter...
+				excludedLines++;
+				// ... and skip it!
+				continue;
+			}
+			// Subtract the number of excluded lines from i, to ensure excluded lines aren't counted!
+			this->Lines[i]->lineNum = i - excludedLines;
+			this->Lines[i]->PageOffset = Size;
+			Size += this->Lines[i]->Size;
 		}
-		for(int i = 0; i < Lines.size(); i++) {
-			Lines[i]->lineNum = i;
-		}
-		//Lines.back()->Size = 0;
+		// ... and connect the lines accordingly!
 		ConnectSelectableLines();
 	}
-	
 	void WritePage()
 	{
 		vector<u8> output;
@@ -976,13 +887,15 @@ public:
 
 	void ConnectSelectableLines()
 	{
-		vector<int> SelectableLines;
+		vector<int> SelectableLines{};
 		GetSelectableLines(SelectableLines);
-		if (SelectableLines.size() > 0) {
+		if (SelectableLines.size() > 0) 
+		{
 			SelectableLines.insert(SelectableLines.begin(), SelectableLines.back());
 			SelectableLines.push_back(SelectableLines[1]);
 
-			for (int i = 1; i < SelectableLines.size() - 1; i++) {
+			for (int i = 1; i < SelectableLines.size() - 1; i++) 
+			{
 				Lines[SelectableLines[i]]->UpOffset = Lines[SelectableLines[i - 1]]->PageOffset;
 				Lines[SelectableLines[i]]->DownOffset = Lines[SelectableLines[i + 1]]->PageOffset;
 			}
@@ -990,22 +903,24 @@ public:
 			CurrentLineOffset = Lines[SelectableLines[1]]->PageOffset;
 			Lines[SelectableLines[1]]->Color = HIGHLIGHTED_LINE_COLOR_OFFSET;
 		}
-		else {
+		else 
+		{
 			CurrentLineOffset = NUM_WORD_ELEMS * 4;
 		}
 	}
 
 	void GetSelectableLines(vector<int> &SelectableLines)
 	{
-		for (int i = 0; i < Lines.size(); i++) {
-			if (Lines[i]->type != COMMENT_LINE && Lines[i]->type != PRINT_LINE) {
-				if (Lines[i]->getIsSelectable())
+		for (int i = 0; i < Lines.size(); i++) 
+		{
+			Line* currLine = Lines[i];
+			if (currLine->type != COMMENT_LINE && currLine->type != PRINT_LINE)
+			{
+				if (!currLine->behaviorFlags[Line::lbf_UNSELECTABLE] && 
+					!currLine->behaviorFlags[Line::lbf_HIDDEN] && 
+					!currLine->behaviorFlags[Line::lbf_REMOVED])
 				{
 					SelectableLines.push_back(i);
-				}
-				else
-				{
-					Lines[i]->Color = UNSELECTABLE_LINE_COLOR_OFFSET;
 				}
 			}
 		}

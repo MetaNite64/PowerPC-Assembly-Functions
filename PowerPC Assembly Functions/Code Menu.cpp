@@ -61,6 +61,10 @@ int ALC_P1_INDEX = -1;
 int ALC_P2_INDEX = -1;
 int ALC_P3_INDEX = -1;
 int ALC_P4_INDEX = -1;
+int ALC_P1_FLASH_RED_INDEX = -1;
+int ALC_P2_FLASH_RED_INDEX = -1;
+int ALC_P3_FLASH_RED_INDEX = -1;
+int ALC_P4_FLASH_RED_INDEX = -1;
 int BIG_HEAD_INDEX = -1;
 int RANDOM_ANGLE_INDEX = -1;
 int WAR_MODE_INDEX = -1;
@@ -76,17 +80,16 @@ int DASH_ATTACK_ITEM_GRAB_INDEX = -1;
 int TRIP_TOGGLE_INDEX = -1;
 int TRIP_RATE_MULTIPLIER_INDEX = -1;
 int TRIP_INTERVAL_INDEX = -1;
-int BACKPLATE_COLOR_1_INDEX = -1;
-int BACKPLATE_COLOR_2_INDEX = -1;
-int BACKPLATE_COLOR_3_INDEX = -1;
-int BACKPLATE_COLOR_4_INDEX = -1;
-int BACKPLATE_COLOR_C_INDEX = -1;
-int BACKPLATE_COLOR_T_INDEX = -1;
+int PSCC_COLOR_1_INDEX = -1;
+int PSCC_COLOR_2_INDEX = -1;
+int PSCC_COLOR_3_INDEX = -1;
+int PSCC_COLOR_4_INDEX = -1;
 int JUMPSQUAT_OVERRIDE_TOGGLE_INDEX = -1;
 int JUMPSQUAT_OVERRIDE_FRAMES_INDEX = -1;
 int JUMPSQUAT_OVERRIDE_MIN_INDEX = -1;
 int JUMPSQUAT_OVERRIDE_MAX_INDEX = -1;
 int EXTERNAL_INDEX = -1;	//Used for GCTRM codes that use other indexs for context
+int TOGGLE_BASE_LINE_INDEX = -1;
 
 //constant overrides
 vector<ConstantPair> constantOverrides;
@@ -287,23 +290,164 @@ std::vector<string> THEME_LIST;
 std::vector<menuTheme> THEME_SPEC_LIST{};
 std::array<bool, themeConstants::tpi__PATH_COUNT> THEME_FILE_GOT_UNIQUE_PREFIX{};
 
-namespace backplateColorConstants
+namespace pscc
 {
-	const std::array<std::string, playerSlotColorLevel::pSCL__COUNT> modeNames =
+	namespace psccConstants
 	{
-		"Disabled",
-		"Shields & Death Plumes",
-		"Shields, Death Plumes, & In-Game HUD",
-		"All In-Game Elements, CSS, & Results Screen",
-		"All Elements & CSS Color Change Input",
+		const std::string predefStr = "pd_";
+		const std::string menuSuffStr = "_m";
+		const std::string ingameSuffStr = "_ig";
+		const std::string secSuffStr = "_2";
+
+		const std::string SchemeNameP1 = "P1";
+		const std::string SchemeNameP2 = "P2";
+		const std::string SchemeNameP3 = "P3";
+		const std::string SchemeNameP4 = "P4";
+		const std::string SchemeNameRGB = "RGB";
+
+		const std::string ColNameP1_M = predefStr + SchemeNameP1 + menuSuffStr;
+		const std::string ColNameP1_M2 = predefStr + SchemeNameP1 + menuSuffStr + secSuffStr;
+		const std::string ColNameP1_IG = predefStr + SchemeNameP1 + ingameSuffStr;
+		const std::string ColNameP1_IG2 = predefStr + SchemeNameP1 + ingameSuffStr + secSuffStr;
+		const std::string ColNameP2_M = predefStr + SchemeNameP2 + menuSuffStr;
+		const std::string ColNameP2_M2 = predefStr + SchemeNameP2 + menuSuffStr + secSuffStr;
+		const std::string ColNameP2_IG = predefStr + SchemeNameP2 + ingameSuffStr;
+		const std::string ColNameP2_IG2 = predefStr + SchemeNameP2 + ingameSuffStr + secSuffStr;
+		const std::string ColNameP3_M = predefStr + SchemeNameP3 + menuSuffStr;
+		const std::string ColNameP3_M2 = predefStr + SchemeNameP3 + menuSuffStr + secSuffStr;
+		const std::string ColNameP3_IG = predefStr + SchemeNameP3 + ingameSuffStr;
+		const std::string ColNameP3_IG2 = predefStr + SchemeNameP3 + ingameSuffStr + secSuffStr;
+		const std::string ColNameP4_M = predefStr + SchemeNameP4 + menuSuffStr;
+		const std::string ColNameP4_M2 = predefStr + SchemeNameP4 + menuSuffStr + secSuffStr;
+		const std::string ColNameP4_IG = predefStr + SchemeNameP4 + ingameSuffStr;
+		const std::string ColNameP4_IG2 = predefStr + SchemeNameP4 + ingameSuffStr + secSuffStr;
+		const std::string ColNameRGB = predefStr + SchemeNameRGB;
+	}
+
+	bool color::colorValid() const
+	{
+		return (hue != FLT_MAX) && (saturation != FLT_MAX) && (luminance != FLT_MAX);
+	}
+
+	std::map<std::string, color> colorTable =
+	{
+		{psccConstants::ColNameP1_M,	{0.00f,	1.00f,	0.50f}},
+		{psccConstants::ColNameP1_IG2,	{5.80f,	1.00f,	0.50f}},
+		{psccConstants::ColNameP2_M,	{3.90f,	0.70f,	0.50f}},
+		{psccConstants::ColNameP2_IG,	{3.60f,	1.00f,	0.50f}},
+		{psccConstants::ColNameP3_M,	{0.85f,	1.00f,	0.50f}},
+		{psccConstants::ColNameP3_IG,	{1.05f,	0.80f,	0.55f}},
+		{psccConstants::ColNameP4_M,	{2.10f,	0.80f,	0.375f}},
+		{psccConstants::ColNameRGB,     {0.00f, 1.00f,  0.50f}},
 	};
+	std::size_t getColorTableSizeInBytes()
+	{
+		return (colorTable.size() * colorTableEntrySizeInBytes);
+	}
+
+	colorScheme::colorScheme(std::string nameIn)
+	{
+		name = nameIn;
+		colors.fill("");
+	}
+	void colorScheme::downfillEmptySlots()
+	{
+		if (!colors[colorSchemeColorSlots::cscs_MENU1].empty())
+		{
+			std::string defaultColor = colors[colorSchemeColorSlots::cscs_MENU1];
+			for (std::size_t i = colorSchemeColorSlots::cscs_MENU1 + 1; i < colorSchemeColorSlots::cscs__COUNT; i++)
+			{
+				if (colors[i].empty())
+				{
+					colors[i] = defaultColor;
+				}
+				else
+				{
+					defaultColor = colors[i];
+				}
+			}
+		}
+	}
+	bool colorScheme::schemeValid() const
+	{
+		bool result = 1;
+
+		for (auto i : colors)
+		{
+			result &= (pscc::colorTable.find(i) != pscc::colorTable.end());
+		}
+
+		return result;
+	}
+	colorSchemeTable::colorSchemeTable()
+	{
+		entries.resize(schemePredefIDs::spi__COUNT, colorScheme());
+		colorScheme* currCol = nullptr;
+
+		currCol = &entries[schemePredefIDs::spi_P1];
+		currCol->name = psccConstants::SchemeNameP1;
+		currCol->colors[colorSchemeColorSlots::cscs_MENU1] = psccConstants::ColNameP1_M;
+		currCol->colors[colorSchemeColorSlots::cscs_MENU2] = psccConstants::ColNameP1_M;
+		currCol->colors[colorSchemeColorSlots::cscs_INGAME1] = psccConstants::ColNameP1_M;
+		currCol->colors[colorSchemeColorSlots::cscs_INGAME2] = psccConstants::ColNameP1_IG2;
+
+		currCol = &entries[schemePredefIDs::spi_P2];
+		currCol->name = psccConstants::SchemeNameP2;
+		currCol->colors[colorSchemeColorSlots::cscs_MENU1] = psccConstants::ColNameP2_M;
+		currCol->colors[colorSchemeColorSlots::cscs_MENU2] = psccConstants::ColNameP2_M;
+		currCol->colors[colorSchemeColorSlots::cscs_INGAME1] = psccConstants::ColNameP2_IG;
+		currCol->colors[colorSchemeColorSlots::cscs_INGAME2] = psccConstants::ColNameP2_IG;
+
+		currCol = &entries[schemePredefIDs::spi_P3];
+		currCol->name = psccConstants::SchemeNameP3;
+		currCol->colors[colorSchemeColorSlots::cscs_MENU1] = psccConstants::ColNameP3_M;
+		currCol->colors[colorSchemeColorSlots::cscs_MENU2] = psccConstants::ColNameP3_M;
+		currCol->colors[colorSchemeColorSlots::cscs_INGAME1] = psccConstants::ColNameP3_IG;
+		currCol->colors[colorSchemeColorSlots::cscs_INGAME2] = psccConstants::ColNameP3_IG;
+
+		currCol = &entries[schemePredefIDs::spi_P4];
+		currCol->name = psccConstants::SchemeNameP4;
+		currCol->colors[colorSchemeColorSlots::cscs_MENU1] = psccConstants::ColNameP4_M;
+		currCol->colors[colorSchemeColorSlots::cscs_MENU2] = psccConstants::ColNameP4_M;
+		currCol->colors[colorSchemeColorSlots::cscs_INGAME1] = psccConstants::ColNameP4_M;
+		currCol->colors[colorSchemeColorSlots::cscs_INGAME2] = psccConstants::ColNameP4_M;
+	}
+	std::size_t colorSchemeTable::tableSizeInBytes() const
+	{
+		return (entries.size() * schemeTableEntrySizeInBytes);
+	}
+	std::vector<unsigned char> colorSchemeTable::tableToByteVec() const
+	{
+		std::vector<unsigned char> result(tableSizeInBytes(), 0x00);
+		for (std::size_t i = 0, writeIdx = 0; i < entries.size(); i++)
+		{
+			for (auto u : entries[i].colors)
+			{
+				result[writeIdx++] = std::distance(colorTable.begin(), colorTable.find(u));
+			}
+		}
+		return result;
+	}
+	std::size_t getColorTableOffsetToColor(std::string colorName)
+	{
+		std::size_t result = SIZE_MAX;
+
+		auto findRes = colorTable.find(colorName);
+		if (findRes != colorTable.end())
+		{
+			result = std::distance(colorTable.begin(), findRes) * colorTableEntrySizeInBytes;
+		}
+
+		return result;
+	}
+
+	colorSchemeTable schemeTable;
 }
-const unsigned long BACKPLATE_COLOR_TOTAL_COLOR_COUNT = 10;
 
 // Incoming Configuration XML Variables
 std::vector<std::string> CONFIG_INCOMING_COMMENTS{};
 bool CONFIG_DELETE_CONTROLS_COMMENTS = false;
-unsigned char CONFIG_BACKPLATE_COLOR_MODE = backplateColorConstants::pSCL_NONE;
+bool CONFIG_PSCC_ENABLED = false;
 bool CONFIG_DASH_ATTACK_ITEM_GRAB_ENABLED = 1;
 bool CONFIG_JUMPSQUAT_OVERRIDE_ENABLED = 1;
 
@@ -335,7 +479,7 @@ const std::string GCTRMCommandBase = "\"" + GCTRMExePath + "\" -g -l -q ";
 	const std::string asmFileName = "Net-CodeMenu.asm";
 	const std::string asmTextFileName = "Net-CodeMenu.txt";
 	const std::string cmnuFileName = "dnet.cmnu";
-	const std::string asmBuildLocationDirectory = "Source/Netplay/";
+	const std::vector<std::string> asmBuildLocationDirectories = { "Source/Netplay/" };
 	const std::string cmnuBuildLocationDirectory = "pf/menu3/";
 	#elif BUILD_NETPLAY_FILES == false
 	const std::string changelogFileName = "Code_Menu_Changelog.txt";
@@ -345,7 +489,7 @@ const std::string GCTRMCommandBase = "\"" + GCTRMExePath + "\" -g -l -q ";
 	const std::string asmFileName = "CodeMenu.asm";
 	const std::string asmTextFileName = "CodeMenu.txt";
 	const std::string cmnuFileName = "data.cmnu";
-	const std::string asmBuildLocationDirectory = "Source/Project+/";
+	const std::vector<std::string> asmBuildLocationDirectories = { "Source/CodeMenu/", "Source/Project+/" };
 	const std::string cmnuBuildLocationDirectory = "pf/menu3/";
 	#endif
 #else
@@ -355,7 +499,6 @@ const std::string GCTRMCommandBase = "\"" + GCTRMExePath + "\" -g -l -q ";
 //		- boostGCTName
 //		- asmFileName
 //		- asmTextFileName
-//		- asmBuildLocationDirectory
 const std::string changelogFileName = "Code_Menu_Changelog.txt";
 const std::string optionsFilename = "Code_Menu_Options.xml";
 const std::string mainGCTName = "RSBE01";
@@ -363,7 +506,7 @@ const std::string boostGCTName = "";
 const std::string asmFileName = "";
 const std::string asmTextFileName = "";
 const std::string cmnuFileName = "cm.bin";
-const std::string asmBuildLocationDirectory = "";
+const std::vector<std::string> asmBuildLocationDirectories = {};
 const std::string cmnuBuildLocationDirectory = "./";
 #endif
 
@@ -375,7 +518,6 @@ const std::string asmOutputFilePath = outputFolder + asmFileName;
 const std::string asmTextOutputFilePath = outputFolder + asmTextFileName;
 const std::string cmnuOutputFilePath = outputFolder + cmnuFileName;
 const std::string cmnuOptionsOutputFilePath = outputFolder + optionsFilename;
-const std::string asmBuildLocationFilePath = buildFolder + asmBuildLocationDirectory + asmFileName;
 const std::string cmnuBuildLocationFilePath = buildFolder + cmnuBuildLocationDirectory + cmnuFileName;
 std::string getCMNUAbsolutePath()
 {
@@ -387,7 +529,16 @@ void initMenuFileStream()
 	MenuFile.open(cmnuOutputFilePath, fstream::out | fstream::binary);
 }
 
-
+__logOutputStruct::__logOutputStruct()
+{
+	setStandardOutputStream(lava::outputSplitter::sOS_COUT);
+	pushStream(lava::outputEntry(std::make_shared<std::ofstream>(outputFolder + changelogFileName), ULONG_MAX), changelogID);
+}
+std::ostream* __logOutputStruct::getChangelogPtr()
+{
+	return this->getOutputEntry(changelogID)->targetStream.get();
+}
+__logOutputStruct ChangelogOutput{};
 
 // Options File Functions
 namespace xmlTagConstants
@@ -407,7 +558,19 @@ namespace xmlTagConstants
 	const std::string selectionOptionTag = "option";
 	const std::string intTag = "codeMenuInt";
 	const std::string floatTag = "codeMenuFloat";
-	const std::string lockedTag = "locked";
+
+	// Line Behavior Flag Tags
+	struct lbfTagVec : std::vector<std::string>
+	{
+		lbfTagVec()
+		{
+			resize(Line::LineBehaviorFlags::lbf__COUNT, "BAD_TAG");
+			(*this)[Line::LineBehaviorFlags::lbf_UNSELECTABLE] = "locked";
+			(*this)[Line::LineBehaviorFlags::lbf_HIDDEN] = "hidden";
+			(*this)[Line::LineBehaviorFlags::lbf_STICKY] = "sticky";
+			(*this)[Line::LineBehaviorFlags::lbf_REMOVED] = "excluded";
+		}
+	} const lineBehaviorFlagTags;
 }
 pugi::xml_document menuOptionsTree{};
 bool loadMenuOptionsTree(std::string xmlPathIn, pugi::xml_document& destinationDocument)
@@ -484,28 +647,37 @@ void findLinesInPageNode(const pugi::xml_node& pageNode, std::map<std::string, p
 		}
 	}
 }
-std::vector<const char*> splitLineContentString(const std::string& joinedStringIn)
+std::array<bool, Line::LineBehaviorFlags::lbf__COUNT> applyLineBehaviorFlagsFromNode(const pugi::xml_node& sourceNode, Line* targetLine)
 {
-	std::vector<const char*> result{};
+	std::array<bool, Line::LineBehaviorFlags::lbf__COUNT> result{};
 
-	unsigned long currStringIndex = 0x00;
-	for (unsigned long i = 0; i < joinedStringIn.size(); i++)
+	if (targetLine != nullptr)
 	{
-		if (joinedStringIn[i] == 0x00)
+		// For each kind of LineBehaviorFlag...
+		for (std::size_t lbfItr = 0; lbfItr < Line::LineBehaviorFlags::lbf__COUNT; lbfItr++)
 		{
-			result.push_back(joinedStringIn.data() + currStringIndex);
-			currStringIndex = i + 1;
+			// ... check for a corresponding attribute on the current node.
+			pugi::xml_attribute tempAttr = sourceNode.attribute(xmlTagConstants::lineBehaviorFlagTags[lbfItr].c_str());
+			// If one exists...
+			if (tempAttr)
+			{
+				// ... grab its incoming value.
+				bool incomingValue = tempAttr.as_bool();
+				// Record whether or not it's value changed...
+				result[lbfItr] = targetLine->behaviorFlags[lbfItr] != incomingValue;
+				// ... write the incoming value over the current one...
+				targetLine->behaviorFlags[lbfItr].value = incomingValue;
+				// ... and force enable XML output for the flag!
+				targetLine->behaviorFlags[lbfItr].forceXMLOutput = 1;
+			}
 		}
-	}
-	if (currStringIndex < joinedStringIn.size())
-	{
-		result.push_back(joinedStringIn.data() + currStringIndex);
 	}
 
 	return result;
 }
-void applyLineSettingsFromMenuOptionsTree(Page& mainPageIn, const pugi::xml_document& xmlDocumentIn)
+void applyLineSettingsFromMenuOptionsTree(Page& mainPageIn, const pugi::xml_document& xmlDocumentIn, lava::outputSplitter& logOutput)
 {
+
 	// Get a list of all the pages in the menu, including the main page.
 	std::vector<Page*> Pages{ &mainPageIn };
 	recursivelyFindPages(mainPageIn, Pages);
@@ -521,7 +693,26 @@ void applyLineSettingsFromMenuOptionsTree(Page& mainPageIn, const pugi::xml_docu
 		auto pageFindItr = pageNodeMap.find(currPage->PageName);
 		if (pageFindItr == pageNodeMap.end()) continue;
 
-		
+		// ... and if so, apply any behavior flags attributes on the node, and note which have changed!
+		std::array<bool, Line::LineBehaviorFlags::lbf__COUNT> pageLBFsChanged =
+			applyLineBehaviorFlagsFromNode(pageFindItr->second, &currPage->CalledFromLine);
+		// If an LBF changed...
+		bool pageLBFChanged = std::find(pageLBFsChanged.begin(), pageLBFsChanged.end(), 1) != pageLBFsChanged.end();
+		if (pageLBFChanged)
+		{
+			// ... note that the page has changed...
+			logOutput << "[CHANGED] \"" << currPage->PageName << "\"\n";
+			// ... then for each one...
+			for (std::size_t lbfItr = 0; lbfItr < Line::LineBehaviorFlags::lbf__COUNT; lbfItr++)
+			{
+				// ... if that LBF changed...
+				if (!pageLBFsChanged[lbfItr]) continue;
+				// ... note its current state!
+				logOutput << "\t- Page " <<
+					(currPage->CalledFromLine.behaviorFlags[lbfItr] ? "is now " : "is no longer ") <<
+					xmlTagConstants::lineBehaviorFlagTags[lbfItr] << "!\n";
+			}
+		}
 
 		// If there was, we need to apply the default values from the lines in that page node!
 		// Additionally, get a list of all the line nodes in this page node.
@@ -531,11 +722,12 @@ void applyLineSettingsFromMenuOptionsTree(Page& mainPageIn, const pugi::xml_docu
 		for (Line* currLine : currPage->Lines)
 		{
 			// ... check if a corresponding node is present in this page node.
-			std::vector<const char*> deconstructedText = splitLineContentString(currLine->Text);
-			auto lineFindItr = lineNodeMap.find(deconstructedText[0]);
+			std::vector<std::string_view> deconstructedText = splitLineContentString(currLine->Text);
+			auto lineFindItr = lineNodeMap.find(deconstructedText[0].data());
 			if (lineFindItr == lineNodeMap.end()) continue;
 
-			// If there was, pull the default value recorded in the XML and write it into the actual line struct (based on the line type).
+			// If so, pull the default value from the XML and write it into each line struct (based on the line type), and note if it changed!
+			bool lineDefaultChanged = 0;
 			switch (currLine->type)
 			{
 				case SELECTION_LINE:
@@ -548,6 +740,7 @@ void applyLineSettingsFromMenuOptionsTree(Page& mainPageIn, const pugi::xml_docu
 						{
 							u32 valueIn = defaultIndexAttr.as_uint(currLine->Default);
 							valueIn = std::min<unsigned long>(std::max(0u, valueIn), deconstructedText.size() - 2);
+							lineDefaultChanged = valueIn != currLine->Default;
 							currLine->Default = valueIn;
 							currLine->Value = valueIn;
 						}
@@ -564,6 +757,7 @@ void applyLineSettingsFromMenuOptionsTree(Page& mainPageIn, const pugi::xml_docu
 						{
 							int valueIn = defaultValueAttr.as_int(currLine->Default);
 							valueIn = std::min(std::max(valueIn, (int)currLine->Min), (int)currLine->Max);
+							lineDefaultChanged = valueIn != currLine->Default;
 							currLine->Default = valueIn;
 							currLine->Value = valueIn;
 						}
@@ -579,11 +773,16 @@ void applyLineSettingsFromMenuOptionsTree(Page& mainPageIn, const pugi::xml_docu
 						if (defaultValueAttr)
 						{
 							float valueIn = defaultValueAttr.as_float(GetFloatFromHex(currLine->Default));
+							float currDefaultVal = GetFloatFromHex(currLine->Default);
 							float maxVal = GetFloatFromHex(currLine->Max);
 							float minVal = GetFloatFromHex(currLine->Min);
 							valueIn = std::min(std::max(valueIn, minVal), maxVal);
-							currLine->Default = GetHexFromFloat(valueIn);
-							currLine->Value = currLine->Default;
+							lineDefaultChanged = std::abs(valueIn - currDefaultVal) > 0.00001f;
+							if (lineDefaultChanged)
+							{
+								currLine->Default = GetHexFromFloat(valueIn);
+								currLine->Value = currLine->Default;
+							}
 						}
 					}
 					break;
@@ -593,37 +792,75 @@ void applyLineSettingsFromMenuOptionsTree(Page& mainPageIn, const pugi::xml_docu
 					break;
 				}
 			}
-			// Lastly, check if the line is explicitly marked as locked...
-			if (lineFindItr->second.attribute(xmlTagConstants::lockedTag.c_str()).as_bool(0))
-			{
-				// ... and if so, mark it as unselectable.
-				currLine->setIsSelectable(0);
-			}
-		}
 
-		// Lastly, check if the page is explicitly marked as locked...
-		if (pageFindItr->second.attribute(xmlTagConstants::lockedTag.c_str()).as_bool(0))
-		{
-			// ... and if so, mark it as unselectable.
-			currPage->CalledFromLine.setIsSelectable(0);
+			// Additionally, apply any behavior flags attributes on the node, and note which have changed!
+			std::array<bool, Line::LineBehaviorFlags::lbf__COUNT> lineLBFsChanged =
+				applyLineBehaviorFlagsFromNode(lineFindItr->second, currLine);
+
+			// If either the default value or one of the LBFs have changed...
+			bool lineLBFChanged = std::find(lineLBFsChanged.begin(), lineLBFsChanged.end(), 1) != lineLBFsChanged.end();
+			if (lineDefaultChanged || lineLBFChanged)
+			{
+				// ... print the relevant changes!
+				logOutput << "[CHANGED] \"" << currPage->PageName << " > " << currLine->LineName << "\"\n";
+				// If the line's default value changed...
+				if (lineDefaultChanged)
+				{
+					// ... note the change in value (according to the line type).
+					logOutput << "\t- ";
+					switch (currLine->type)
+					{
+					case FLOATING_LINE: { logOutput << "Default Value is now " << GetFloatFromHex(currLine->Default); break; }
+					case SELECTION_LINE: { logOutput << "Default Index is now " << currLine->Default; break; }
+					default: { logOutput << "Default Value is now " << currLine->Default; break; }
+					}
+					logOutput << "\n";
+				}
+				// If an LBF changed...
+				if (lineLBFChanged)
+				{
+					// ... for each one...
+					for (std::size_t lbfItr = 0; lbfItr < Line::LineBehaviorFlags::lbf__COUNT; lbfItr++)
+					{
+						// ... if that LBF changed...
+						if (!lineLBFsChanged[lbfItr]) continue;
+						// ... note its current state!
+						logOutput << "\t- Line " << 
+							(currLine->behaviorFlags[lbfItr] ? "is now " : "is no longer ") <<
+							xmlTagConstants::lineBehaviorFlagTags[lbfItr] << "!\n";
+					}
+				}
+			}
 		}
 	}
 	// And lastly, for each page...
 	for (Page* currPage : Pages)
 	{
-		// ... re-connect the lines in them, to ensure that anything made newly unselectable actually honors that designation.
-		currPage->ConnectSelectableLines();
+		// ... re-prepare the lines in them, to ensure that anything with changed visibility actually honors that designation.
+		currPage->PrepareLines();
 	}
 }
-bool applyLineSettingsFromMenuOptionsTree(Page& mainPageIn, std::string xmlPathIn)
+bool applyLineSettingsFromMenuOptionsTree(Page& mainPageIn, std::string xmlPathIn, lava::outputSplitter& logOutput)
 {
 	bool result = 0;
 
+	logOutput << "\nParsing Options XML from \"" << xmlPathIn << "\"...\n";
 	pugi::xml_document tempDoc;
 	if (loadMenuOptionsTree(xmlPathIn, tempDoc))
 	{
+		logOutput << "[SUCCESS] Applying settings...\n";
+		std::shared_ptr<std::ostream> changelogStreamPtr = logOutput.getOutputEntry(__logOutputStruct::changelogID)->targetStream;
+		std::streampos outputPos = changelogStreamPtr->tellp();
+		applyLineSettingsFromMenuOptionsTree(mainPageIn, tempDoc, logOutput);
+		if (outputPos == changelogStreamPtr->tellp())
+		{
+			logOutput << "[NOTE] XML parsed successfully, no changes detected!\n";
+		}
 		result = 1;
-		applyLineSettingsFromMenuOptionsTree(mainPageIn, tempDoc);
+	}
+	else
+	{
+		logOutput.write("[WARNING] Failed to parse Options XML! Proceeding with default settings.\n", ULONG_MAX, lava::outputSplitter::sOS_CERR);
 	}
 
 	return result;
@@ -653,27 +890,32 @@ bool buildMenuOptionsTreeFromMenu(Page& mainPageIn, std::string xmlPathOut)
 		pugi::xml_node pageNode = menuBaseNode.append_child(xmlTagConstants::pageTag.c_str());
 		pugi::xml_attribute pageNameAttr = pageNode.append_attribute(xmlTagConstants::nameTag.c_str());
 		pageNameAttr.set_value(currPage->PageName.c_str());
-		if (!currPage->CalledFromLine.getIsSelectable())
+		// For each kind of LineBehaviorFlag...
+		for (std::size_t lbfItr = 0; lbfItr < Line::LineBehaviorFlags::lbf__COUNT; lbfItr++)
 		{
-			pageNode.append_attribute(xmlTagConstants::lockedTag.c_str()).set_value("true");
+			// ... grab its setting from the page!
+			Line::LineBehaviorFlagSetting flagSetting = currPage->CalledFromLine.behaviorFlags[lbfItr];
+			// If it's either on or forced labeling is on for it...
+			if (flagSetting || flagSetting.forceXMLOutput)
+			{
+				// ... append the attribute with the appropriate value!
+				pageNode.append_attribute(xmlTagConstants::lineBehaviorFlagTags[lbfItr].c_str()).set_value(flagSetting);
+			}
 		}
 
 		for (unsigned long u = 0; u < currPage->Lines.size(); u++)
 		{
 			const Line* currLine = currPage->Lines[u];
 
-			std::vector<const char*> deconstructedText = splitLineContentString(currLine->Text);
+			std::vector<std::string_view> deconstructedText = splitLineContentString(currLine->Text);
+			pugi::xml_node lineNode{};
 			switch (currLine->type)
 			{
 				case SELECTION_LINE:
 				{
-					pugi::xml_node lineNode = pageNode.append_child(xmlTagConstants::selectionTag.c_str());
+					lineNode = pageNode.append_child(xmlTagConstants::selectionTag.c_str());
 					pugi::xml_attribute lineNameAttr = lineNode.append_attribute(xmlTagConstants::nameTag.c_str());
-					lineNameAttr.set_value(deconstructedText[0]);
-					if (!currLine->getIsSelectable())
-					{
-						lineNode.append_attribute(xmlTagConstants::lockedTag.c_str()).set_value("true");
-					}
+					lineNameAttr.set_value(deconstructedText[0].data());
 					pugi::xml_node defaultValNode = lineNode.append_child(xmlTagConstants::selectionDefaultTag.c_str());
 					defaultValNode.append_attribute(xmlTagConstants::indexTag.c_str()).set_value(std::to_string(currLine->Default).c_str());
 					defaultValNode.append_attribute(xmlTagConstants::editableTag.c_str()).set_value("true");
@@ -681,19 +923,15 @@ bool buildMenuOptionsTreeFromMenu(Page& mainPageIn, std::string xmlPathOut)
 					{
 						pugi::xml_node optionNode = lineNode.append_child(xmlTagConstants::selectionOptionTag.c_str());
 						pugi::xml_attribute optionValueAttr = optionNode.append_attribute(xmlTagConstants::valueTag.c_str());
-						optionValueAttr.set_value(deconstructedText[i]);
+						optionValueAttr.set_value(deconstructedText[i].data());
 					}
 					break;
 				}
 				case INTEGER_LINE:
 				{
-					pugi::xml_node lineNode = pageNode.append_child(xmlTagConstants::intTag.c_str());
+					lineNode = pageNode.append_child(xmlTagConstants::intTag.c_str());
 					pugi::xml_attribute lineNameAttr = lineNode.append_attribute(xmlTagConstants::nameTag.c_str());
-					lineNameAttr.set_value(deconstructedText[0]);
-					if (!currLine->getIsSelectable())
-					{
-						lineNode.append_attribute(xmlTagConstants::lockedTag.c_str()).set_value("true");
-					}
+					lineNameAttr.set_value(deconstructedText[0].data());
 					pugi::xml_node minValNode = lineNode.append_child(xmlTagConstants::valueMinTag.c_str());
 					minValNode.append_attribute(xmlTagConstants::valueTag.c_str()).set_value(std::to_string(currLine->Min).c_str());
 					pugi::xml_node defaultValNode = lineNode.append_child(xmlTagConstants::valueDefaultTag.c_str());
@@ -705,13 +943,9 @@ bool buildMenuOptionsTreeFromMenu(Page& mainPageIn, std::string xmlPathOut)
 				}
 				case FLOATING_LINE:
 				{
-					pugi::xml_node lineNode = pageNode.append_child(xmlTagConstants::floatTag.c_str());
+					lineNode = pageNode.append_child(xmlTagConstants::floatTag.c_str());
 					pugi::xml_attribute lineNameAttr = lineNode.append_attribute(xmlTagConstants::nameTag.c_str());
-					lineNameAttr.set_value(deconstructedText[0]);
-					if (!currLine->getIsSelectable())
-					{
-						lineNode.append_attribute(xmlTagConstants::lockedTag.c_str()).set_value("true");
-					}
+					lineNameAttr.set_value(deconstructedText[0].data());
 					pugi::xml_node minValNode = lineNode.append_child(xmlTagConstants::valueMinTag.c_str());
 					minValNode.append_attribute(xmlTagConstants::valueTag.c_str()).set_value(std::to_string(GetFloatFromHex(currLine->Min)).c_str());
 					pugi::xml_node defaultValNode = lineNode.append_child(xmlTagConstants::valueDefaultTag.c_str());
@@ -726,6 +960,21 @@ bool buildMenuOptionsTreeFromMenu(Page& mainPageIn, std::string xmlPathOut)
 					break;
 				}
 			}
+			if (lineNode)
+			{
+				// For each kind of LineBehaviorFlag...
+				for (std::size_t lbfItr = 0; lbfItr < Line::LineBehaviorFlags::lbf__COUNT; lbfItr++)
+				{
+					// ... grab its setting from the line!
+					Line::LineBehaviorFlagSetting flagSetting = currLine->behaviorFlags[lbfItr];
+					// If it's either on or forced labeling is on for it...
+					if (flagSetting || flagSetting.forceXMLOutput)
+					{
+						// ... append the attribute with the appropriate value!
+						lineNode.append_attribute(xmlTagConstants::lineBehaviorFlagTags[lbfItr].c_str()).set_value(flagSetting);
+					}
+				}
+			}
 		}
 	}
 
@@ -733,7 +982,19 @@ bool buildMenuOptionsTreeFromMenu(Page& mainPageIn, std::string xmlPathOut)
 
 	return result;
 }
+std::vector<std::string_view> splitLineContentString(const std::string& joinedStringIn)
+{
+	std::vector<std::string_view> result{};
 
+	std::size_t currEndIndex = 0;
+	while (currEndIndex < joinedStringIn.size())
+	{
+		result.push_back(std::string_view(&joinedStringIn[currEndIndex]));
+		currEndIndex += result.back().size() + 1;
+	}
+
+	return result;
+}
 
 
 void CodeMenu()
@@ -754,34 +1015,39 @@ void CodeMenu()
 	//player pages
 	vector<Line*> P1Lines;
 	P1Lines.push_back(new Toggle("Infinite Shield", false, INFINITE_SHIELDS_P1_INDEX));
-	P1Lines.push_back(new Selection("P1 Character Select", CHARACTER_LIST, CHARACTER_ID_LIST, 0, CHARACTER_SELECT_P1_INDEX));
+	Selection* P1CharSelect = new Selection("P1 Character Select", CHARACTER_LIST, CHARACTER_ID_LIST, 0, CHARACTER_SELECT_P1_INDEX);
+	P1Lines.push_back(P1CharSelect);
 	//P1Lines.push_back(new Selection("P1 Identity Crisis", CHARACTER_LIST, CHARACTER_ID_LIST, 0, CHARACTER_SELECT_P1_INDEX));
 	P1Lines.push_back(new Floating("Select Percent", 0, 999, 0, 1, PERCENT_SELECT_VALUE_P1_INDEX, "%.0f%%"));
 	P1Lines.push_back(new Toggle("Press DPad to select percent", false, PERCENT_SELECT_ACTIVATOR_P1_INDEX));
 	P1Lines.push_back(new Toggle("Disable DPad", false, DISABLE_DPAD_P1_INDEX));
-	P1Lines.push_back(new Selection("Input Buffer", { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10" }, 0, BUFFER_P1_INDEX));
-	P1Lines.push_back(new Selection("Automatic L-Cancelling", { "OFF", "ON", "Modified" }, 0, ALC_P1_INDEX));
+	Selection* P1InputBuffer = new Selection("Input Buffer", { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10" }, 0, BUFFER_P1_INDEX);
+	P1InputBuffer->behaviorFlags[Line::lbf_HIDDEN].value = !PROJECT_PLUS_EX_BUILD;
+	Selection* P1ALC = new Selection("Automatic L-Cancelling", { "OFF", "ON", "Modified" }, 0, ALC_P1_INDEX);
+	P1ALC->behaviorFlags[Line::lbf_HIDDEN].value = !PROJECT_PLUS_EX_BUILD;
+	P1Lines.push_back(P1InputBuffer);
+	P1Lines.push_back(P1ALC);
 	P1Lines.push_back(new Floating("ALC Modifier", 0.099, 3, 0.5, 0.05, EXTERNAL_INDEX, "%.2fX"));
-	P1Lines.push_back(new Toggle("Red Flash on L-Cancel Failure", false, EXTERNAL_INDEX));
+	P1Lines.back()->behaviorFlags[Line::lbf_HIDDEN].value = !PROJECT_PLUS_EX_BUILD;
+	P1Lines.push_back(new Toggle("Red Flash on L-Cancel Failure", false, ALC_P1_FLASH_RED_INDEX));
+	P1Lines.back()->behaviorFlags[Line::lbf_HIDDEN].value = !PROJECT_PLUS_EX_BUILD;
 	P1Lines.push_back(new Comment(""));
 	P1Lines.push_back(new Print("Tag Hex: %s", { &P1_TAG_STRING_INDEX }));
 	P1Lines.push_back(new Comment("For Use With Tag-Based Costumes"));
-
-	for (auto x : P1Lines) {
-		cout << x->Text << endl;
-	}
 	Page P1("Player 1 Codes", P1Lines);
 
 	vector<Line*> P2Lines;
 	P2Lines.push_back(new Toggle("Infinite Shield", false, INFINITE_SHIELDS_P2_INDEX));
-	P2Lines.push_back(new Selection("P2 Character Select", CHARACTER_LIST, CHARACTER_ID_LIST, 0, CHARACTER_SELECT_P2_INDEX));
+	P2Lines.push_back(new SelectionMirror(*P1CharSelect, "P2 Character Select", 0, CHARACTER_SELECT_P2_INDEX));
 	P2Lines.push_back(new Floating("Select Percent", 0, 999, 0, 1, PERCENT_SELECT_VALUE_P2_INDEX, "%.0f%%"));
 	P2Lines.push_back(new Toggle("Press DPad to select percent", false, PERCENT_SELECT_ACTIVATOR_P2_INDEX));
 	P2Lines.push_back(new Toggle("Disable DPad", false, DISABLE_DPAD_P2_INDEX));
-	P2Lines.push_back(new Selection("Input Buffer", { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10" }, 0, BUFFER_P2_INDEX));
-	P2Lines.push_back(new Selection("Automatic L-Cancelling", { "OFF", "ON", "Modified" }, 0, ALC_P2_INDEX));
+	P2Lines.push_back(new SelectionMirror(*P1InputBuffer, "Input Buffer", 0, BUFFER_P2_INDEX));
+	P2Lines.push_back(new SelectionMirror(*P1ALC, "Automatic L-Cancelling", 0, ALC_P2_INDEX));
 	P2Lines.push_back(new Floating("ALC Modifier", 0.099, 3, 0.5, 0.05, EXTERNAL_INDEX, "%.2fX"));
-	P2Lines.push_back(new Toggle("Red Flash on L-Cancel Failure", false, EXTERNAL_INDEX));
+	P2Lines.back()->behaviorFlags[Line::lbf_HIDDEN].value = !PROJECT_PLUS_EX_BUILD;
+	P2Lines.push_back(new Toggle("Red Flash on L-Cancel Failure", false, ALC_P2_FLASH_RED_INDEX));
+	P2Lines.back()->behaviorFlags[Line::lbf_HIDDEN].value = !PROJECT_PLUS_EX_BUILD;
 	P2Lines.push_back(new Comment(""));
 	P2Lines.push_back(new Print("Tag Hex: %s", { &P2_TAG_STRING_INDEX }));
 	P2Lines.push_back(new Comment("For Use With Tag-Based Costumes"));
@@ -789,15 +1055,16 @@ void CodeMenu()
 
 	vector<Line*> P3Lines;
 	P3Lines.push_back(new Toggle("Infinite Shield", false, INFINITE_SHIELDS_P3_INDEX));
-	P3Lines.push_back(new Selection("P3 Character Select", CHARACTER_LIST, CHARACTER_ID_LIST, 0, CHARACTER_SELECT_P3_INDEX));
-	//P3Lines.push_back(new Selection("P3 Identity Crisis", CHARACTER_LIST, CHARACTER_ID_LIST, 0, CHARACTER_SELECT_P3_INDEX));
+	P3Lines.push_back(new SelectionMirror(*P1CharSelect, "P3 Character Select", 0, CHARACTER_SELECT_P3_INDEX));
 	P3Lines.push_back(new Floating("Select Percent", 0, 999, 0, 1, PERCENT_SELECT_VALUE_P3_INDEX, "%.0f%%"));
 	P3Lines.push_back(new Toggle("Press DPad to select percent", false, PERCENT_SELECT_ACTIVATOR_P3_INDEX));
 	P3Lines.push_back(new Toggle("Disable DPad", false, DISABLE_DPAD_P3_INDEX));
-	P3Lines.push_back(new Selection("Input Buffer", { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10" }, 0, BUFFER_P3_INDEX));
-	P3Lines.push_back(new Selection("Automatic L-Cancelling", { "OFF", "ON", "Modified" }, 0, ALC_P3_INDEX));
+	P3Lines.push_back(new SelectionMirror(*P1InputBuffer, "Input Buffer", 0, BUFFER_P3_INDEX));
+	P3Lines.push_back(new SelectionMirror(*P1ALC, "Automatic L-Cancelling", 0, ALC_P3_INDEX));
 	P3Lines.push_back(new Floating("ALC Modifier", 0.099, 3, 0.5, 0.05, EXTERNAL_INDEX, "%.2fX"));
-	P3Lines.push_back(new Toggle("Red Flash on L-Cancel Failure", false, EXTERNAL_INDEX));
+	P3Lines.back()->behaviorFlags[Line::lbf_HIDDEN].value = !PROJECT_PLUS_EX_BUILD;
+	P3Lines.push_back(new Toggle("Red Flash on L-Cancel Failure", false, ALC_P3_FLASH_RED_INDEX));
+	P3Lines.back()->behaviorFlags[Line::lbf_HIDDEN].value = !PROJECT_PLUS_EX_BUILD;
 	P3Lines.push_back(new Comment(""));
 	P3Lines.push_back(new Print("Tag Hex: %s", { &P3_TAG_STRING_INDEX }));
 	P3Lines.push_back(new Comment("For Use With Tag-Based Costumes"));
@@ -805,15 +1072,16 @@ void CodeMenu()
 
 	vector<Line*> P4Lines;
 	P4Lines.push_back(new Toggle("Infinite Shield", false, INFINITE_SHIELDS_P4_INDEX));
-	P4Lines.push_back(new Selection("P4 Character Select", CHARACTER_LIST, CHARACTER_ID_LIST, 0, CHARACTER_SELECT_P4_INDEX));
-	//P4Lines.push_back(new Selection("P4 Identity Crisis", CHARACTER_LIST, CHARACTER_ID_LIST, 0, CHARACTER_SELECT_P4_INDEX));
+	P4Lines.push_back(new SelectionMirror(*P1CharSelect, "P4 Character Select", 0, CHARACTER_SELECT_P4_INDEX));
 	P4Lines.push_back(new Floating("Select Percent", 0, 999, 0, 1, PERCENT_SELECT_VALUE_P4_INDEX, "%.0f%%"));
 	P4Lines.push_back(new Toggle("Press DPad to select percent", false, PERCENT_SELECT_ACTIVATOR_P4_INDEX));
 	P4Lines.push_back(new Toggle("Disable DPad", false, DISABLE_DPAD_P4_INDEX));
-	P4Lines.push_back(new Selection("Input Buffer", { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10" }, 0, BUFFER_P4_INDEX));
-	P4Lines.push_back(new Selection("Automatic L-Cancelling", { "OFF", "ON", "Modified" }, 0, ALC_P4_INDEX));
+	P4Lines.push_back(new SelectionMirror(*P1InputBuffer, "Input Buffer", 0, BUFFER_P4_INDEX));
+	P4Lines.push_back(new SelectionMirror(*P1ALC, "Automatic L-Cancelling", 0, ALC_P4_INDEX));
 	P4Lines.push_back(new Floating("ALC Modifier", 0.099, 3, 0.5, 0.05, EXTERNAL_INDEX, "%.2fX"));
-	P4Lines.push_back(new Toggle("Red Flash on L-Cancel Failure", false, EXTERNAL_INDEX));
+	P4Lines.back()->behaviorFlags[Line::lbf_HIDDEN].value = !PROJECT_PLUS_EX_BUILD;
+	P4Lines.push_back(new Toggle("Red Flash on L-Cancel Failure", false, ALC_P4_FLASH_RED_INDEX));
+	P4Lines.back()->behaviorFlags[Line::lbf_HIDDEN].value = !PROJECT_PLUS_EX_BUILD;
 	P4Lines.push_back(new Comment(""));
 	P4Lines.push_back(new Print("Tag Hex: %s", { &P4_TAG_STRING_INDEX }));
 	P4Lines.push_back(new Comment("For Use With Tag-Based Costumes"));
@@ -871,7 +1139,7 @@ void CodeMenu()
 	ConstantsLines.push_back(new Selection("Staling Toggle", { "Default", "ON", "OFF" }, 0, STALING_TOGGLE_INDEX));
 	if (CONFIG_DASH_ATTACK_ITEM_GRAB_ENABLED)
 	{
-		ConstantsLines.push_back(new Selection("Aerial & Dash Attack Item Grab Toggle", { "OFF", "ON" }, 0, DASH_ATTACK_ITEM_GRAB_INDEX));
+		ConstantsLines.push_back(new Toggle("Aerial & Dash Attack Item Grab Toggle", 0, DASH_ATTACK_ITEM_GRAB_INDEX));
 	}
 	//ConstantsLines.push_back(new Selection("Tripping Toggle", { "OFF", "ON" }, 0, TRIP_TOGGLE_INDEX));
 	//ConstantsLines.push_back(new Floating("Tripping Rate", 0, 100, 1.0, 1.0, TRIP_RATE_MULTIPLIER_INDEX, "%.2f%"));
@@ -904,9 +1172,13 @@ void CodeMenu()
 	SpecialModeLines.push_back(&DBZModePage.CalledFromLine);
 	SpecialModeLines.push_back(new Toggle("Random Angle Mode", false, RANDOM_ANGLE_INDEX));
 	SpecialModeLines.push_back(new Toggle("War Mode", false, WAR_MODE_INDEX));
+	SpecialModeLines.back()->behaviorFlags[Line::lbf_REMOVED].value = true;
 	SpecialModeLines.push_back(new Selection("Gameplay Speed Modifier", { "Off", "1.25", "1.5x", "2.0x", "1/2x", "3/4x" }, 0, SPEED_INDEX));
+	SpecialModeLines.back()->behaviorFlags[Line::lbf_REMOVED].value = !PROJECT_PLUS_EX_BUILD;
 	SpecialModeLines.push_back(new Toggle("Scale Mode", false, SCALE_INDEX));
+	SpecialModeLines.back()->behaviorFlags[Line::lbf_REMOVED].value = !PROJECT_PLUS_EX_BUILD;
 	SpecialModeLines.push_back(new Floating("Scale Modifier", 0.5, 3, 1, 0.05, EXTERNAL_INDEX, "%.2fX"));
+	SpecialModeLines.back()->behaviorFlags[Line::lbf_REMOVED].value = !PROJECT_PLUS_EX_BUILD;
 	SpecialModeLines.push_back(new Selection("Big Head Mode", { "Off", "On", "Larger", "Largest", "Largerest" }, 0, BIG_HEAD_INDEX));
 	Page SpecialModePage("Special Modes", SpecialModeLines);
 
@@ -961,16 +1233,19 @@ void CodeMenu()
 	// HUD Color Settings
 	vector<Line*> HUDColorLines;
 	HUDColorLines.push_back(new Comment("Replacement Hud Colors:"));
-	HUDColorLines.push_back(new Integer("Red",		0, BACKPLATE_COLOR_TOTAL_COLOR_COUNT - 1, 1, 1, BACKPLATE_COLOR_1_INDEX, "Color %d", Integer::INT_FLAG_ALLOW_WRAP));
-	HUDColorLines.push_back(new Integer("Blue",		0, BACKPLATE_COLOR_TOTAL_COLOR_COUNT - 1, 2, 1, BACKPLATE_COLOR_2_INDEX, "Color %d", Integer::INT_FLAG_ALLOW_WRAP));
-	HUDColorLines.push_back(new Integer("Yellow",	0, BACKPLATE_COLOR_TOTAL_COLOR_COUNT - 1, 3, 1, BACKPLATE_COLOR_3_INDEX, "Color %d", Integer::INT_FLAG_ALLOW_WRAP));
-	HUDColorLines.push_back(new Integer("Green",	0, BACKPLATE_COLOR_TOTAL_COLOR_COUNT - 1, 4, 1, BACKPLATE_COLOR_4_INDEX, "Color %d", Integer::INT_FLAG_ALLOW_WRAP));
-	HUDColorLines.push_back(new Integer("Gray",		9, 9, 9, 0, BACKPLATE_COLOR_C_INDEX, "Color %d")); // Note: Cannot be changed, on purpose.
-	HUDColorLines.back()->setIsSelectable(0);
-	HUDColorLines.push_back(new Integer("Clear",	0, 0, 0, 0, BACKPLATE_COLOR_T_INDEX, "Color %d")); // Note: Cannot be changed, on purpose.
-	HUDColorLines.back()->setIsSelectable(0);
+	std::vector<std::string> schemeNames(pscc::schemeTable.entries.size(), "");
+	for (std::size_t i = 0; i < pscc::schemeTable.entries.size(); i++)
+	{
+		schemeNames[i] = pscc::schemeTable.entries[i].name;
+	}
+	Selection* P1ColorLine = new Selection("Player 1", schemeNames, pscc::schemePredefIDs::spi_P1, PSCC_COLOR_1_INDEX);
+	P1ColorLine->behaviorFlags[Line::lbf_STICKY].value = 1;
+	HUDColorLines.push_back(P1ColorLine);
+	HUDColorLines.push_back(new SelectionMirror(*P1ColorLine, "Player 2", pscc::schemePredefIDs::spi_P2, PSCC_COLOR_2_INDEX));
+	HUDColorLines.push_back(new SelectionMirror(*P1ColorLine, "Player 3", pscc::schemePredefIDs::spi_P3, PSCC_COLOR_3_INDEX));
+	HUDColorLines.push_back(new SelectionMirror(*P1ColorLine, "Player 4", pscc::schemePredefIDs::spi_P4, PSCC_COLOR_4_INDEX));
 	Page HUDColorsPage("HUD Colors", HUDColorLines);
-	if ((CONFIG_BACKPLATE_COLOR_MODE > 0) && (CONFIG_BACKPLATE_COLOR_MODE < backplateColorConstants::pSCL__COUNT))
+	if (CONFIG_PSCC_ENABLED && (pscc::schemeTable.entries.size() >= 4))
 	{
 		MainLines.push_back(&HUDColorsPage.CalledFromLine);
 	}
@@ -1011,8 +1286,9 @@ void CodeMenu()
 	MainLines.push_back(new Integer("P1 4th Shield Blue", 0, 0xFF, 0, 1, SHIELD_BLUE_4));
 	MainLines.push_back(new Integer("P1 4th Shield Alpha", 0, 0xFF, 0, 1, SHIELD_ALPHA_4));*/
 
-
-
+	MainLines.push_back(new Selection("_", { "OFF", "ON"}, 0, TOGGLE_BASE_LINE_INDEX));
+	MainLines.back()->behaviorFlags[Line::LineBehaviorFlags::lbf_HIDDEN].value = 1;
+	MainLines.back()->behaviorFlags[Line::LineBehaviorFlags::lbf_UNSELECTABLE].value = 1;
 	Page Main("Main", MainLines);
 	
 	//Unclepunch fps code
@@ -1352,14 +1628,12 @@ void ActualCodes()
 		ASMEnd(0x5400efff); //rlwinm. r0, r0, 29, 31, 31
 	}
 
-	printf("%X\n", SHIELD_RED_1);
-
 	ControlCodes();
 }
 
 void CreateMenu(Page MainPage)
 {
-	applyLineSettingsFromMenuOptionsTree(MainPage, cmnuOptionsOutputFilePath);
+	applyLineSettingsFromMenuOptionsTree(MainPage, cmnuOptionsOutputFilePath, ChangelogOutput);
 	buildMenuOptionsTreeFromMenu(MainPage, cmnuOptionsOutputFilePath);
 
 	//make pages
@@ -1370,6 +1644,7 @@ void CreateMenu(Page MainPage)
 	for (int i = 0; i < Pages.size(); i++) {
 		CurrentOffset += Page::NUM_WORD_ELEMS * 4;
 		for (Line* &x : Pages[i]->Lines) {
+			if (x->behaviorFlags[Line::lbf_REMOVED]) continue; // If the line is explicitly marked as removed, skip it!
 			if (x->Index != nullptr) {
 				*(x->Index) = CurrentOffset;
 			}
@@ -1400,12 +1675,12 @@ void CreateMenu(Page MainPage)
 	//button combos
 	AddValueToByteArray(BUTTON_L | BUTTON_R | BUTTON_Y , Header); //salty runback
 	AddValueToByteArray(BUTTON_L | BUTTON_R | BUTTON_X, Header); //skip results
-	// Old Line Color Table
-	AddValueToByteArray(0x00, Header);
-	AddValueToByteArray(0x00, Header);
-	AddValueToByteArray(0x00, Header);
-	AddValueToByteArray(0x00, Header);
-	AddValueToByteArray(0x00, Header);
+	// Float Conversion Space
+	AddValueToByteArray(0x43300000, Header); // Conversion Constant
+	AddValueToByteArray(0x00000000, Header);
+	AddValueToByteArray(0x43300000, Header); // Conversion Staging Space
+	AddValueToByteArray(0x00000000, Header);
+	AddValueToByteArray(0x00000000, Header); // Extra Staging Word
 	//frame timers
 	AddValueToByteArray(0, Header); //move frame timer
 	AddValueToByteArray(0, Header); //value frame timer
@@ -1567,17 +1842,16 @@ void CreateMenu(Page MainPage)
 	// Tripping Cooldown Toggle
 	AddValueToByteArray(TRIP_INTERVAL_INDEX, Header);
 
-	// Backplate Settings
-	AddValueToByteArray(BACKPLATE_COLOR_1_INDEX, Header);
-	AddValueToByteArray(BACKPLATE_COLOR_2_INDEX, Header);
-	AddValueToByteArray(BACKPLATE_COLOR_3_INDEX, Header);
-	AddValueToByteArray(BACKPLATE_COLOR_4_INDEX, Header);
-	AddValueToByteArray(BACKPLATE_COLOR_C_INDEX, Header);
-	AddValueToByteArray(BACKPLATE_COLOR_T_INDEX, Header);
-	//BACKPLATE_COLOR_TEAM_BATTLE_STORE_LOC
-	// Used to store some temp values related to the color changer!
+	// PSCC Settings
+	AddValueToByteArray(PSCC_COLOR_1_INDEX, Header);
+	AddValueToByteArray(PSCC_COLOR_2_INDEX, Header);
+	AddValueToByteArray(PSCC_COLOR_3_INDEX, Header);
+	AddValueToByteArray(PSCC_COLOR_4_INDEX, Header);
+	//PSCC_TEAM_BATTLE_STORE_LOC
 	// First byte is an offset used to lbzx to either VALUE or DEFAULT quickly (init to VALUE).
 	AddValueToByteArray(Line::VALUE << 0x18, Header);
+	// Player Slot Color Float Table Address
+	AddValueToByteArray(0, Header);
 
 	// Jumpsquat Override
 	AddValueToByteArray(JUMPSQUAT_OVERRIDE_TOGGLE_INDEX, Header);
@@ -1599,21 +1873,38 @@ void CreateMenu(Page MainPage)
 		AddValueToByteArray(x, Header);
 	}
 
-	// Reserve Space for Hook VTable
-	if (HOOK_VTABLE.table_size() > 0)
+	// If there are MEM2Constants...
+	if (MEM2_CONSTANTS_LENGTH > 0)
 	{
-		Header.resize(Header.size() + HOOK_VTABLE.table_size(), 0);
+		// ... reserve space for them in the CMNU!
+		Header.resize(Header.size() + MEM2_CONSTANTS_LENGTH, 0xCC);
 	}
+
+	
+	// PSCC Quick Font Loc
+	AddValueToByteArray(0xFF, Header);
+	AddValueToByteArray(0xFF, Header);
+	AddValueToByteArray(0xFF, Header);
+	AddValueToByteArray(0xA8, Header);
+
 	if (LINE_COLOR_TABLE.table_size() > 0)
 	{
-		for (std::size_t i = 0; i < LINE_COLOR_TABLE.COLOR_COUNT; i++)
+		for (std::size_t i = 0; i < LINE_COLOR_TABLE.__COLOR_COUNT; i++)
 		{
-			AddValueToByteArray(LINE_COLOR_TABLE.COLORS[i], Header);
+			AddValueToByteArray(LINE_COLOR_TABLE.COLORS_ARR[i], Header);
 		}
 	}
 
+	if (HEAP_ADDRESS_TABLE.table_size() > 0)
+	{
+		// Reserve space for Address Table (just initialized to zeroes, value populated in-game).
+		Header.resize(Header.size() + HEAP_ADDRESS_TABLE.address_array_size(), 0x00);
+		// Write ID Array to Header.
+		Header.insert(Header.end(), HEAP_ADDRESS_TABLE.idArray.cbegin(), HEAP_ADDRESS_TABLE.idArray.cend());
+	}
+
 	if (START_OF_CODE_MENU - START_OF_CODE_MENU_HEADER != Header.size()) {
-		cout << "Messed up header\n";
+		std::cout << "Messed up header\n";
 		exit(-1);
 	}
 
@@ -1625,17 +1916,88 @@ void CreateMenu(Page MainPage)
 }
 
 void constantOverride() {
-	ASMStart(0x80023d60, "[CM: Code Menu] Constant Overrides");
+	std::size_t rgbColorTableOffset = pscc::getColorTableOffsetToColor(pscc::psccConstants::ColNameRGB);
+
+	ASMStart(0x80023d60, std::string("[CM: Code Menu] Constant Overrides") + 
+		std::string((CONFIG_PSCC_ENABLED && (rgbColorTableOffset != SIZE_MAX)) ? " + Incr. PSCC RGB Strobe Float" : ""));
 
 	int reg1 = 4;
 	int reg2 = 5;
+	int reg3 = 11;
 
+	unsigned short prevIndexHiHalf = 0xFFFF;
+	unsigned short prevDestHiHalf = 0xFFFF;
 	for(auto& x : constantOverrides) {
-		LoadWordToReg(reg1, *x.index + Line::VALUE);
-		SetRegister(reg2, x.address);
-		STW(reg1, reg2, 0);
+
+		unsigned short indexHiHalf = *x.index >> 0x10;
+		unsigned short indexLoHalf = (*x.index & 0xFFFF) + Line::VALUE;
+		indexHiHalf += bool(indexLoHalf >= 0x8000);
+		if (indexHiHalf != prevIndexHiHalf)
+		{
+			ADDIS(reg1, 0, indexHiHalf);
+		}
+		LWZ(reg3, reg1, indexLoHalf);
+		prevIndexHiHalf = indexHiHalf;
+
+		unsigned short destHiHalf = x.address >> 0x10;
+		unsigned short destLoHalf = x.address & 0xFFFF;
+		destHiHalf += bool(destLoHalf >= 0x8000);
+		if (destHiHalf != prevDestHiHalf)
+		{
+			ADDIS(reg2, 0, destHiHalf);
+		}
+		STW(reg3, reg2, destLoHalf);
+		prevDestHiHalf = destHiHalf;
 	}
 
+	if (CONFIG_PSCC_ENABLED && (rgbColorTableOffset != SIZE_MAX))
+	{
+		int menuNotLoadedLabel = GetNextLabel();
+		// If reg1 isn't already loaded with the top half of START_OF_CODE_MENU_HEADER...
+		if (prevIndexHiHalf != unsigned short(START_OF_CODE_MENU_HEADER >> 0x10))
+		{
+			// ... set up its value!
+			ADDIS(reg1, 0, START_OF_CODE_MENU_HEADER >> 0x10);
+		}
+		// Try to load START_OF_CODE_MENU from the header.
+		LWZ(reg2, reg1, (START_OF_CODE_MENU_HEADER & 0xFFFF) + 4);
+		// Use reg1 to store the full START_OF_CODE_MENU value into reg3...
+		ADDI(reg3, reg1, START_OF_CODE_MENU & 0xFFFF);
+		// ... then compare the two: the loaded value vs the expected value.
+		CMPL(reg3, reg2, EQUAL_L);
+		// And if the two aren't equal, then we know the menu isn't loaded, skip to notLoaded tag!
+		JumpToLabel(menuNotLoadedLabel, bCACB_NOT_EQUAL);
+
+		
+		// Load the Float Table address into reg3!
+		LWZ(reg3, reg1, PSCC_FLOAT_TABLE_LOC & 0xFFFF);
+		// Load the hue value for color 0 (ie. the first float in the table)
+		LFS(13, reg3, rgbColorTableOffset);
+
+		// Calculate the constant for our incrementing value, load it into fr12...
+		float conversionConstant = 1.0f/90.0f;
+		unsigned short conversionHex = lava::bytesToFundamental<unsigned long>(lava::fundamentalToBytes<float>(conversionConstant).data()) >> 0x10;
+		ADDIS(reg2, 0, conversionHex);
+		STW(reg2, reg1, (FLOAT_CONVERSION_STAGING_LOC & 0xFFFF) + 4);
+		LFS(12, reg1, (FLOAT_CONVERSION_STAGING_LOC & 0xFFFF) + 4);
+		// ... and add it to f13 to increment the hue! 
+		FADDS(13, 13, 12);
+
+		// Load 6.0f into fr12...
+		ADDIS(reg2, 0, 0x40c0);
+		STW(reg2, reg1, (FLOAT_CONVERSION_STAGING_LOC & 0xFFFF) + 4);
+		LFS(12, reg1, (FLOAT_CONVERSION_STAGING_LOC & 0xFFFF) + 4);
+		// ... and if our incremented hue is above 6.0f...
+		FCMPU(13, 12, 1);
+		BC(2, bCACB_LESSER.inConditionRegField(1));
+		// ... set it back to 0.0f (subtract it from itself)!
+		FSUB(13, 13, 13);
+
+		// Finally, store the incremented hue back in the float table!
+		STFS(13, reg3, rgbColorTableOffset);
+		Label(menuNotLoadedLabel);
+	}
+	
 	ASMEnd(0x2c000000); //cmpwi, r0, 0
 }
 
@@ -2171,15 +2533,29 @@ void ControlCodeMenu()
 							RLWINM(5, 5, 2, 0, 31); //<<2
 							LBZ(4, Reg2, 0); //get current ID
 							ADDI(5, 5, Selection::SELECTION_LINE_OFFSETS_START + 2);
-							LHZX(5, 3, 5);
+							LWZ(Reg1, 3, Selection::SELECTION_LINE_SOURCE_SELECTION_INDEX);
+							LHZX(5, Reg1, 5);
 							If(4, NOT_EQUAL, 5); { // If the New ID and Old ID don't match...
 								SetRegister(Reg1, 0);
 								STB(5, Reg2, 0); // Overwrite Old ID with New one
+								// This seems to trigger a line at 0x809463C4 in "processBegin/[stLoaderPlayer]/st_loader_player.o" (0x80954350 in Ghidra)
+								// which ultimately leads to the line:
+								//		(*(code *)this->vtable->stLoaderPlayer$$removeEntity)(this); Starting @ 0x809543d4 in Ghidra
+								// This, I assume, is the thing that kills the entity and prompts spawning the new one.
+								// There's *also*, however, 0x80946358 (Ghidra: 0x809542e4), which directly checks whether or not the Slot ID
+								// recorded in the PlayerInitStruct is different from the currently selected one, along with some other conditions.
+								// If so, then we run the following:
+								//		(*(code *)this->vtable->stLoaderPlayer$$removeEntity)(this); Starting @ 0x8095431c in Ghidra
+								// Either one of these could be the thing responsible for ultimately causing the change to happen,
+								// not sure which it is for sure.
+								// In either case, should end up calling "removeEntity/[stLoaderPlayer]" 0x80948da8 (0x80956d34 in Ghidra)
+								// Messing with the r3 value at 0x809463C4 does prompt a reload
+								// Messing with the r0 value at 0x80946358 DOES NOT! Neither in SSE, nor in VS
 
 								SetRegister(Reg3, 0x43AD8);
 								LoadWordToReg(Reg4, 0x805A00E0); // Get ptr to GameGlobal Struct
-								LWZ(Reg4, Reg4, 0x10); // Get ptr to gmSelCharData
-								ADD(Reg4, Reg4, Reg3); // Add 0x43AD8 to addr of this struct? Way beyond the listed range in Ghidra (0x901c4618?)
+								LWZ(Reg4, Reg4, 0x10); // Get ptr to gmSelCharData (0x90180b40 in testing)
+								ADD(Reg4, Reg4, Reg3); // Add 0x43AD8 to addr of this struct (901c4618)? Way beyond the listed range in Ghidra
 								LWZ(Reg3, CharacterBufferReg, CHR_BUFFER_PORT_OFFSET); // Get port for character to change...
 								MULLI(Reg3, Reg3, 0x5C); // ... and multiply it by 0x5C, probably to index into a list of entries
 								STWX(Reg1, Reg4, Reg3); // Write 0 into (&gmSelCharData + 0x43AD8 + OffsetIntoListForTargetPort), Setting to 1 gives RAlt?
@@ -2452,7 +2828,7 @@ void ResetPage(int StackReg, int TempReg1, int TempReg2, int TempReg3, int TempR
 			ResetLine(TempReg2, TempReg1, StackReg, TempReg3, TempReg4, TempReg5, TempReg6, 1);
 
 			LHZ(TempReg6, TempReg2, Line::SIZE);
-			ADD(TempReg2, TempReg2, TempReg6); //next line
+			LHZUX(TempReg6, TempReg2, TempReg6); //next line
 		}EndWhile();
 	}IterateStackEnd();
 }
@@ -3110,12 +3486,17 @@ void PrintPage(int PageReg, int SettingsPtrReg, int Reg1, int Reg2, int Reg3, in
 		PrintCodeMenuLine(Reg2, SettingsPtrReg, Reg5, Reg3, Reg4);
 
 		LHZ(3, Reg2, Line::SIZE);
-		ADD(Reg2, Reg2, 3); //next line
+		LHZUX(3, Reg2, 3);
 	}EndWhile();
 }
 
 void PrintCodeMenuLine(int LinePtrReg, int SettingsPtrReg, int ColorArrayPtrReg, int TempReg1, int TempReg2)
 {
+	int skipPrintingLabel = GetNextLabel();
+	LBZ(TempReg2, LinePtrReg, Line::FLAGS);
+	ANDI(TempReg2, TempReg2, Line::LINE_FLAGS_FIELDS::LINE_FLAG_SKIP_PRINTING);
+	JumpToLabel(skipPrintingLabel, bCACB_NOT_EQUAL);
+
 	LBZ(TempReg2, LinePtrReg, Line::TYPE);
 
 	LBZ(TempReg1, LinePtrReg, Line::COLOR);
@@ -3142,10 +3523,11 @@ void PrintCodeMenuLine(int LinePtrReg, int SettingsPtrReg, int ColorArrayPtrReg,
 		LWZ(5, LinePtrReg, Line::VALUE); //get setting
 
 		If(TempReg2, EQUAL_I, SELECTION_LINE); {
-			ADDI(TempReg1, LinePtrReg, Selection::SELECTION_LINE_OFFSETS_START);
+			LWZ(TempReg2, LinePtrReg, Selection::SELECTION_LINE_SOURCE_SELECTION_INDEX);
+			ADDI(TempReg1, TempReg2, Selection::SELECTION_LINE_OFFSETS_START);
 			RLWINM(5, 5, 2, 0, 31); //<< 2
 			LHZX(5, TempReg1, 5); //get string offset
-			ADD(5, 5, LinePtrReg); //get string offset
+			ADD(5, 5, TempReg2); //get string offset
 		}EndIf();
 
 		SprintF(4, { 5 });
@@ -3156,6 +3538,8 @@ void PrintCodeMenuLine(int LinePtrReg, int SettingsPtrReg, int ColorArrayPtrReg,
 	PrintString(TempReg1, TempReg2, SettingsPtrReg);
 
 	NewLine(SettingsPtrReg);
+
+	Label(skipPrintingLabel);
 }
 
 //requires 2 endifs
@@ -3221,7 +3605,8 @@ void SaveReplay()
 	SetRegs(3, { REPLAY_NTE_DATA_BUFFER_LOC, 42 });
 	CallBrawlFunc(0x80152b5c); //ctnteFileReplay
 
-	SetRegister(4, REPLAY_BUFFER_BEGIN);
+	GetHeapAddress(HEAP_ADDRESS_TABLE.CACHED_REPLAY_HEAP, 4);
+	ADDI(4, 4, REPLAY_HEAP_REPLAY_BUFFER_BEGIN_OFF);
 	CallBrawlFunc(0x80152c4c); //setData
 
 	SetArgumentsFromRegs(3, { SectionBufferReg, NTEBufferReg, HighTimeReg, LowTimeReg });
@@ -3308,3 +3693,4 @@ void RunIfPortToggle(int ARRAY_LOC, int PortReg) {
 		}
 	}
 }
+

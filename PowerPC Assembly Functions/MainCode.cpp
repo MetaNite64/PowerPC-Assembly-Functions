@@ -20,7 +20,7 @@
 #include "_ThemeChange.h"
 #include "_DashAttackItemGrab.h"
 #include "_TripRateModifier.h"
-#include "_BackplateColors.h"
+#include "_PlayerSlotColorChangers.h"
 #include "_JumpsquatOverride.h"
 //#include "FPS Display.h"
 using namespace std;
@@ -126,92 +126,88 @@ int main(int argc, char** argv)
 		buildRosterLists();
 		buildThemeLists();
 
-		std::shared_ptr<std::ofstream> soloLogFileOutput = std::make_shared<std::ofstream>(outputFolder + changelogFileName);
-		*soloLogFileOutput << "PowerPC Assembly Functions (Code Menu Building Utility " << lava::version << ")\n";
+		ChangelogOutput.write(
+			"PowerPC Assembly Functions (Code Menu Building Utility " + lava::version + ")\n", ULONG_MAX, lava::outputSplitter::sOS_NULL);
 
-		lava::outputSplitter logOutput;
-		logOutput.setStandardOutputStream(lava::outputSplitter::sOS_COUT);
-		logOutput.pushStream(lava::outputEntry(soloLogFileOutput, ULONG_MAX));
-
-		logOutput << "Building \"" << cmnuFileName << "\" for ";
+		ChangelogOutput << "Building \"" << cmnuFileName << "\" for ";
 		switch (BUILD_TYPE)
 		{
 			case NORMAL:
 			{
-				logOutput << "LegacyTE";
+				ChangelogOutput << "LegacyTE";
 				break;
 			}
 			case PMEX:
 			{
-				logOutput << "Project M EX";
+				ChangelogOutput << "Project M EX";
 				break;
 			}
 			case PROJECT_PLUS:
 			{
 				if (PROJECT_PLUS_EX_BUILD == true)
 				{
-					logOutput << "Project+ EX";
+					ChangelogOutput << "Project+ EX";
 				}
 				else
 				{
-					logOutput << "Project+";
+					ChangelogOutput << "Project+";
 				}
 				break;
 			}
 			default:
 			{
-				logOutput << "Unknown";
+				ChangelogOutput << "Unknown";
 				break;
 			}
 		}
 		if (BUILD_NETPLAY_FILES == true)
 		{
-			logOutput << " Netplay";
+			ChangelogOutput << " Netplay";
 		}
 		if (DOLPHIN_BUILD == true)
 		{
-			logOutput << " (Dolphin)";
+			ChangelogOutput << " (Dolphin)";
 		}
 		else
 		{
-			logOutput << " (Offline)";
+			ChangelogOutput << " (Offline)";
 		}
-		logOutput << "\n";
+		ChangelogOutput << "\n";
 		if (DOLPHIN_BUILD == true)
 		{
-			logOutput << "Note: This code menu was configured for use with Dolphin only, and IS NOT COMPATIBLE with consoles!\n";
-			logOutput << "\tAttempting to use this code menu on console can (and likely will) damage your system.\n";
+			ChangelogOutput << "Note: This code menu was configured for use with Dolphin only, and IS NOT COMPATIBLE with consoles!\n";
+			ChangelogOutput << "\tAttempting to use this code menu on console can (and likely will) damage your system.\n";
 		}
 
 		if (TOURNAMENT_ADDITION_BUILD == true)
 		{
-			logOutput << "Note: Tournament Addition Flag is ON!\n";
+			ChangelogOutput << "Note: Tournament Addition Flag is ON!\n";
 		}
 		if (IS_DEBUGGING == true)
 		{
-			logOutput << "Note: General Debug Flag is ON!\n";
+			ChangelogOutput << "Note: General Debug Flag is ON!\n";
 		}
 		if (EON_DEBUG_BUILD == true)
 		{
-			logOutput << "Note: Eon's Debug Flag is ON!\n";
+			ChangelogOutput << "Note: Eon's Debug Flag is ON!\n";
 		}
 
 		// If we're building in netplay mode, we'll try to parse using the netplay-specific config file.
-		bool parsedConfigXML = (BUILD_NETPLAY_FILES && lava::parseAndApplyConfigXML(netMenuConfigXMLFileName, logOutput));
+		bool parsedConfigXML = (BUILD_NETPLAY_FILES && lava::parseAndApplyConfigXML(netMenuConfigXMLFileName, ChangelogOutput));
 		// If we don't parse the netplay config (either because we're building the offline menu or cuz it didn't exist)...
 		if (!parsedConfigXML)
 		{
 			// try to parse the offline config file.
-			parsedConfigXML = lava::parseAndApplyConfigXML(menuConfigXMLFileName, logOutput);
+			parsedConfigXML = lava::parseAndApplyConfigXML(menuConfigXMLFileName, ChangelogOutput);
 		}
 		// And if we couldn't parse that either...
 		if (!parsedConfigXML)
 		{
-			logOutput.write("[WARNING] Failed to parse config XML! Proceeding with default settings.\n", ULONG_MAX, lava::outputSplitter::sOS_CERR);
+			ChangelogOutput.write("[WARNING] Failed to parse config XML! Proceeding with default settings.\n", ULONG_MAX, lava::outputSplitter::sOS_CERR);
 		}
 
 		CodeStart(asmTextOutputFilePath);
-		logOutput << "\n";
+		ChangelogOutput << "\n";
 
 		//place all ASM code here
 
@@ -241,7 +237,9 @@ int main(int argc, char** argv)
 		
 		cssRosterChange(); themeChange(); 
 
-		playerSlotColorChangers(CONFIG_BACKPLATE_COLOR_MODE);
+		//playerSlotColorChangers(CONFIG_BACKPLATE_COLOR_MODE);
+
+		playerSlotColorChangersV3(CONFIG_PSCC_ENABLED);
 
 		dashAttackItemGrab(CONFIG_DASH_ATTACK_ITEM_GRAB_ENABLED);
 
@@ -291,14 +289,14 @@ int main(int argc, char** argv)
 		{
 			if (lava::offerCopyOverAndBackup(cmnuOutputFilePath, cmnuBuildLocationFilePath, lava::CMNUCopyOverride))
 			{
-				logOutput << "Note: Backed up \"" << cmnuBuildLocationFilePath << "\" and overwrote it with the newly built Code Menu.\n";
+				ChangelogOutput << "Note: Backed up \"" << cmnuBuildLocationFilePath << "\" and overwrote it with the newly built Code Menu.\n";
 			}
 		}
 		else if (std::filesystem::is_directory(buildFolder + cmnuBuildLocationDirectory))
 		{
 			if (lava::offerCopy(cmnuOutputFilePath, cmnuBuildLocationFilePath, lava::CMNUCopyOverride))
 			{
-				logOutput << "Note: Copied newly built Code Menu to \"" << cmnuBuildLocationFilePath << "\".\n";
+				ChangelogOutput << "Note: Copied newly built Code Menu to \"" << cmnuBuildLocationFilePath << "\".\n";
 			}
 		}
 
@@ -307,14 +305,14 @@ int main(int argc, char** argv)
 		lava::gecko::buildGeckoCodeDictionary();
 		if (!CONFIG_DISABLE_ASM_DISASSEMBLY && std::filesystem::is_regular_file(symbolMapInputFileName))
 		{
-			logOutput << "\nSymbol map file detected! Parsing \"" << symbolMapInputFileName << "\"... ";
+			ChangelogOutput << "\nSymbol map file detected! Parsing \"" << symbolMapInputFileName << "\"... ";
 			if (lava::ppc::parseMapFile(symbolMapInputFileName))
 			{
-				logOutput << "Success!\n";
+				ChangelogOutput << "Success!\n";
 			}
 			else
 			{
-				logOutput << "Failure!\n";
+				ChangelogOutput.write("Failure!\n", ULONG_MAX, lava::outputSplitter::sOS_CERR);
 			}
 		}
 		if (CONFIG_OUTPUT_ASM_INSTRUCTION_DICTIONARY)
@@ -322,33 +320,22 @@ int main(int argc, char** argv)
 			lava::ppc::summarizeInstructionDictionary(outputFolder + "ASMDictionary.txt");
 		}
 		// Handle ASM output.
-		logOutput << "\nWriting ASM file... ";
+		ChangelogOutput << "\nWriting ASM file... ";
 		if (MakeASM(asmTextOutputFilePath, asmOutputFilePath, CONFIG_DISABLE_ASM_DISASSEMBLY))
 		{
-			logOutput << "Success!\n";
-			if (std::filesystem::is_regular_file(asmBuildLocationFilePath))
+			ChangelogOutput << "Success!\n";
+			if (lava::placeASMInBuild(*ChangelogOutput.getChangelogPtr()))
 			{
-				if (lava::offerCopyOverAndBackup(asmOutputFilePath, asmBuildLocationFilePath, lava::ASMCopyOverride))
+				if (lava::handleAutoGCTRMProcess(*ChangelogOutput.getChangelogPtr()) && BUILD_NETPLAY_FILES)
 				{
-					logOutput << "Note: Backed up \"" << asmBuildLocationFilePath << "\" and overwrote it with the newly built ASM.\n";
+					ChangelogOutput << "Note: The built GCTs are configured for use in Dolphin Netplay only, and ARE NOT COMPATIBLE with consoles!\n";
+					ChangelogOutput << "Attempting to use them on console can (and likely will) damage your system.\n\n";
 				}
-			}
-			else if (std::filesystem::is_directory(buildFolder + asmBuildLocationDirectory))
-			{
-				if (lava::offerCopy(asmOutputFilePath, asmBuildLocationFilePath, lava::ASMCopyOverride))
-				{
-					logOutput << "Note: Copied newly built ASM to \"" << asmBuildLocationFilePath << "\".\n";
-				}
-			}
-			if (lava::handleAutoGCTRMProcess(*soloLogFileOutput, lava::GCTBuildOverride) && BUILD_NETPLAY_FILES)
-			{
-				logOutput << "Note: The built GCTs are configured for use in Dolphin Netplay only, and ARE NOT COMPATIBLE with consoles!\n";
-				logOutput << "Attempting to use them on console can (and likely will) damage your system.\n\n";
 			}
 		}
 		else
 		{
-			logOutput.write("Failure!\n", ULONG_MAX, lava::outputSplitter::stdOutStreamEnum::sOS_CERR);
+			ChangelogOutput.write("Failure!\n", ULONG_MAX, lava::outputSplitter::stdOutStreamEnum::sOS_CERR);
 		}
 	}
 	else

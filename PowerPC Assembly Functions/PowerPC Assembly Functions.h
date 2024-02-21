@@ -11,11 +11,9 @@
 #include <cassert>
 #include <sstream>
 #include "_lavaGeckoHexConvert.h"
+#include "_CodeMenuHeaderConstants.h"
+#include "_lavaOutputSplitter.h"
 using namespace std;
-
-typedef unsigned int u32;
-typedef unsigned short u16;
-typedef unsigned char u8;
 
 //set to 1 if debugging.  records positions every frame and compares them during replay
 #define IS_DEBUGGING 0
@@ -50,7 +48,7 @@ extern const std::array<std::string, characterListVersions::__clv_Count> charact
 #define PROJECT_PLUS_EX_BUILD (true && (BUILD_TYPE == PROJECT_PLUS))
 // Controls whether or not externally defined character, rosters, and themes are loaded into their respective lists.
 // Relevant constants are defined in "Code Menu.cpp", and relevant code found in "MainCode.cpp".
-#define COLLECT_EXTERNAL_EX_CHARACTERS (true && PROJECT_PLUS_EX_BUILD)
+#define COLLECT_EXTERNAL_EX_CHARACTERS (true)
 #define COLLECT_EXTERNAL_ROSTERS (true && PROJECT_PLUS_EX_BUILD)
 #define COLLECT_EXTERNAL_THEMES (true) // Note, this isn't locked to P+Ex builds, actually. Should work on any build with a Code Menu!
 
@@ -63,8 +61,10 @@ extern const std::array<std::string, characterListVersions::__clv_Count> charact
 #define ALLOW_BLANK_CODE_NAMES_IN_ASM true
 extern bool CONFIG_OUTPUT_ASM_INSTRUCTION_DICTIONARY;
 extern bool CONFIG_DISABLE_ASM_DISASSEMBLY;
+extern bool CONFIG_ENABLE_ASM_HEX_COMMENTS;
 extern bool CONFIG_DELETE_ASM_TXT_FILE;
 extern bool CONFIG_ALLOW_IMPLICIT_OPTIMIZATIONS; // Allows the builder to implicitly replace MULLIs by powers of 2 with bitshift operations!
+extern bool CONFIG_ALLOW_BLA_FUNCTION_CALLS; // Enables function calls via BLA! Only valid for builds that have Eon's BLA code in your build!
 
 //ROTC floating offsets
 #define FS_20_0 -0x7920
@@ -104,7 +104,12 @@ extern std::string MENU_NAME;
 #define GF_DRAW_SETUP_COORD_2D 0x8001abbc
 #define GX_DRAW_SET_VTX_COLOR_PRIM_ENVIROMENT 0x8001a5c0
 #define GET_FLOAT_WORK_MODULE 0x807acbb4 //r3 = work module ptr, r4 is variable, returns value in f1
+#define GF_GET_HEAP 0x800249cc // r3 = Heap ID
+#define FT_GET_INPUT 0x8083ae38 // r3 = FighterPtr, RETURNS IN r3 & r4!!
+#define FT_MGR_GET_PLAYER_NO 0x80815ad0 // r3 = ftManager pointer, r4 = entryID
 ///Function addresses end
+
+
 
 ///addresses maintained by Brawl start
 #define IS_REPLAY_LOC 0x805BBFC0 //equals 1 if in replay, 2 if in match
@@ -129,7 +134,21 @@ extern std::string MENU_NAME;
 #define BUTTON_CONFIG_START 0x805b7480 //start of in game custom control map
 #define BASIC_VARIABLE_START_ADDRESS 0x901ae000
 #define BASIC_VARIABLE_BLOCK_SIZE 0x870
+#define FT_MANAGER_ADDRESS 0x80629a00
 ///addresses maintained by Brawl end
+
+// Replay Heap Variables
+static const int REPLAY_HEAP_VANILLA_ADDRESS = 0x91301B00;
+static const int REPLAY_HEAP_REPLAY_BUFFER_BEGIN_OFF = 0x91301c00 - REPLAY_HEAP_VANILLA_ADDRESS;
+static const int REPLAY_HEAP_REPLAY_BUFFER_END_OFF = 0x9134CA00 - REPLAY_HEAP_VANILLA_ADDRESS; // Associated accesses not converted yet!
+//half word that is used to store which alt stage was loaded
+static const int REPLAY_HEAP_ALT_STAGE_STORAGE_OFF = 0x91301f4a - REPLAY_HEAP_VANILLA_ADDRESS;
+//half word that stores current and recorded auto L-Cancel settings
+static const int REPLAY_HEAP_AUTO_L_CANCEL_SETTING_OFF = 0x91301f4e - REPLAY_HEAP_VANILLA_ADDRESS;
+//byte flag == 1 when in stage select menu
+static const int IN_STAGE_SELECT_MENU_FLAG = 0x91301f50 - REPLAY_HEAP_VANILLA_ADDRESS;
+//word that saves copy of endless rotation queue for replay
+static const int REPLAY_HEAP_ENDLESS_ROTATION_QUEUE_OFF = 0x91301f54 - REPLAY_HEAP_VANILLA_ADDRESS;
 
 ///reserved memory for storage start
 ///in replay
@@ -154,32 +173,6 @@ extern std::string MENU_NAME;
 #define END_OF_REPLAY_BUFFER   (RANDOM_1_TO_1_CPP_FLAG_LOC - 0x100) //tells when to stop recording inputs
 ///set END_OF_REPLAY_BUFFER to the last constant - 0x80 to ensure no memory leaks
 
-///at end of MEM2
-const int MENU_BLOCK_PTRS = 0x935ce300;
-const int MENU_BUTTON_STRING_LOC = MENU_BLOCK_PTRS + 4 * 4;
-const int MENU_CONTROL_STRING_LOC = MENU_BUTTON_STRING_LOC + 8 * 12;
-const int TAG_IN_USE_LOC = MENU_CONTROL_STRING_LOC + 8 * 12;
-const int REPLACE_NAME_OLD_TIME_LOC = TAG_IN_USE_LOC + 4;
-const int REPLACE_NAME_TIME_ADDRESS = REPLACE_NAME_OLD_TIME_LOC + 4;
-#define DISABLE_DPAD_ASL_STORAGE REPLACE_NAME_TIME_ADDRESS + 4 //4
-#define GCC_BUTTON_STORAGE_LOC DISABLE_DPAD_ASL_STORAGE + 4 //8
-#define WIIMOTE_CONVERTED_BUTTON_STORAGE_LOC GCC_BUTTON_STORAGE_LOC + 8 //8
-#define WIIMOTE_CONVERSION_TABLE WIIMOTE_CONVERTED_BUTTON_STORAGE_LOC + 8 //16
-#define WIICHUCK_CONVERSION_TABLE WIIMOTE_CONVERSION_TABLE + 16 //16
-#define CLASSIC_CONVERSION_TABLE WIICHUCK_CONVERSION_TABLE + 16 //16
-#define KAPPA_ITEM_FLAG CLASSIC_CONVERSION_TABLE + 16 //4
-#define MAIN_BUFFER_PTR KAPPA_ITEM_FLAG + 4 //4
-#define STRING_BUFFER MAIN_BUFFER_PTR + 4 //0x100, 0x935ce428
-#define IASA_OVERLAY_MEM_PTR_LOC STRING_BUFFER + 0x100 //4
-#define IASA_TRIGGER_OVERLAY_COMMAND_PTR_LOC IASA_OVERLAY_MEM_PTR_LOC + 4 //4
-#define IASA_TERMINATE_OVERLAY_COMMAND_PTR_LOC IASA_TRIGGER_OVERLAY_COMMAND_PTR_LOC + 4 //4
-#define IASA_STATE IASA_TERMINATE_OVERLAY_COMMAND_PTR_LOC + 4 //4
-#define IS_IN_GAME_FLAG IASA_STATE + 4 //4
-#define WRITE_SD_FILE_HEADER_LOC IS_IN_GAME_FLAG + 4 //0x18
-#define ACTIVE_TAG_ID_BY_PORT WRITE_SD_FILE_HEADER_LOC + 0x18 //4
-#define HEX_TO_ASCII_TABLE ACTIVE_TAG_ID_BY_PORT + 0x4 //0x10
-#define COSTUME_PATH_ADDRESS_RESULT HEX_TO_ASCII_TABLE + 0x10 //4
-#define CSTICK_TAUNT_SPECIAL_WORDS (COSTUME_PATH_ADDRESS_RESULT + 4) //
 ///reserved memory for storage end
 
 ///Control code constants start
@@ -204,25 +197,10 @@ const int MENU_SELECTED_TAG_OFFSET = 0x164;
 ///Control code constants end
 
 
-#define REPLAY_ALT_STAGE_STORAGE_LOC 0x91301f4a //half word that is used to store which alt stage was loaded
-#define REPLAY_AUTO_L_CANCEL_SETTING 0x91301f4e //half word that stores current and recorded auto L-Cancel settings
-#define IN_STAGE_SELECT_MENU_FLAG 0x91301f50 //byte flag == 1 when in stage select menu
-#define REPLAY_ENDLESS_ROTATION_QUEUE 0x91301f54 //word that saves copy of endless rotation queue for replay
 
 ///addresses end
 
 ///constants start
-///colors
-#define RED 0xFF0000FF
-#define BLUE 0x0066FFFF
-#define ORANGE 0xFF9900FF
-#define GREEN 0x33CC33FF
-#define YELLOW 0xFFFF00FF
-#define BLACK 0x000000FF
-#define WHITE 0xFFFFFFFF
-#define PURPLE 0x6E0094FF
-#define TEAL 0x6DD0FFFF
-///colors end
 ///primitive types
 #define PRIMITIVE_LINE 0xB0
 #define PRIMITIVE_QUAD 0x80
@@ -270,6 +248,8 @@ constexpr unsigned long bitIndexFromButtonHex(unsigned long buttonHex, bool doIn
 #define BRANCH_IF_TRUE 0b01100
 #define BRANCH_IF_FALSE 0b00100
 #define BRANCH_ALWAYS 0b10100
+#define BRANCH_IF_DZ 0b10010
+#define BRANCH_IF_DNZ 0b10000
 #define MAX_IFS 15
 #define MAX_LABELS 50
 #define MAX_JUMPS 50
@@ -337,6 +317,7 @@ struct branchConditionAndConditionBit
 
 	// Returns a copy of this bCACB, with the ConditionRegField set to the specified value!
 	branchConditionAndConditionBit inConditionRegField(unsigned char ConditionRegFieldIn) const;
+	branchConditionAndConditionBit andDecrementCTR(bool branchIfCTRIsZero) const;
 };
 const static branchConditionAndConditionBit bCACB_EQUAL				=		{ BRANCH_IF_TRUE, EQ, 0 };
 const static branchConditionAndConditionBit bCACB_NOT_EQUAL			=		{ BRANCH_IF_FALSE, EQ, 0 };
@@ -346,7 +327,23 @@ const static branchConditionAndConditionBit bCACB_LESSER			=		{ BRANCH_IF_TRUE, 
 const static branchConditionAndConditionBit bCACB_LESSER_OR_EQ		=		{ BRANCH_IF_FALSE, GT, 0 };
 const static branchConditionAndConditionBit bCACB_OVERFLOW			=		{ BRANCH_IF_TRUE, SO, 0 };
 const static branchConditionAndConditionBit bCACB_NO_OVERFLOW		=		{ BRANCH_IF_FALSE, SO, 0 };
+const static branchConditionAndConditionBit bCACB_DZ				=		{ BRANCH_IF_DZ, 0, 0 };
+const static branchConditionAndConditionBit bCACB_DNZ				=		{ BRANCH_IF_DNZ, 0, 0 };
 const static branchConditionAndConditionBit bCACB_UNSPECIFIED		=		{ INT_MAX, INT_MAX, UCHAR_MAX };
+
+namespace labels
+{
+	struct labelJump
+	{
+		int labelNum = INT_MAX;
+		std::streampos jumpSourcePos = SIZE_MAX;
+		branchConditionAndConditionBit jumpCondition = bCACB_UNSPECIFIED;
+		bool setLR = 0;
+
+		labelJump(int labelNumIn = INT_MAX, std::streampos jumpSourcePosIn = SIZE_MAX, branchConditionAndConditionBit jumpConditionIn = bCACB_UNSPECIFIED, bool setLRIn = 0) :
+			labelNum(labelNumIn), jumpSourcePos(jumpSourcePosIn), jumpCondition(jumpConditionIn), setLR(setLRIn) {};
+	};
+}
 
 ///variables start
 extern fstream WPtr;
@@ -360,12 +357,9 @@ static int WhileConditionArray[MAX_IFS] = {};
 static int WhileCompareArray[MAX_IFS] = {};
 static int WhileIndex = 0;
 static int ASMStartAddress = 0;
-static int LabelPosArray[MAX_LABELS] = {};
-static int LabelIndex = 0;
-static int JumpLabelNumArray[MAX_JUMPS] = {};
-static int JumpFromArray[MAX_JUMPS] = {};
-static branchConditionAndConditionBit JumpFromConditionArray[MAX_JUMPS] = {};
-static int JumpIndex = 0;
+extern std::vector<std::streampos> LabelPosVec;
+extern std::vector<labels::labelJump> LabelJumpVec;
+extern std::streampos currentGeckoEmbedStartPos;  // Used for opening and closing Gecko Embeds!
 static vector<int> FPPushRecords;
 static vector<int> CounterLoppRecords;
 static vector<int> StackIteratorRecords;
@@ -403,15 +397,20 @@ void LoadByteToReg(int Register, int Address);
 void LoadWordToReg(int DestReg, int Reg, int Address);
 void LoadHalfToReg(int DestReg, int Reg, int Address);
 void LoadByteToReg(int DestReg, int Reg, int Address);
+void StoreWordAtAddr(int SourceReg, int AddrReg, int Address);
+void StoreHalfAtAddr(int SourceReg, int AddrReg, int Address);
+void StoreByteAtAddr(int SourceReg, int AddrReg, int Address);
 void ConvertIntToFloat(int SourceReg, int TempReg, int ResultReg);
 void ASMStart(int BranchAddress, std::string name = "", std::string blurb = "");
 void ASMEnd(int Replacement);
 void ASMEnd();
 void CodeRaw(std::string name, std::string blurb, const std::vector<unsigned long>& rawHexIn);
+void CodeRawStart(std::string name, std::string blurb);
+void CodeRawEnd();
 void Label(int LabelNum);
 int GetNextLabel();
-void JumpToLabel(int LabelNum, branchConditionAndConditionBit conditionIn = bCACB_UNSPECIFIED);
-void JumpToLabel(int LabelNum, int BranchCondition, int ConditionBit);
+void JumpToLabel(int LabelNum, branchConditionAndConditionBit conditionIn = bCACB_UNSPECIFIED, bool setLinkRegister = 0);
+void JumpToLabel(int LabelNum, int BranchCondition, int ConditionBit, bool setLinkRegister = 0);
 void CompleteJumps();
 int CalcBranchOffset(int Location, int Target);
 void StrCpy(int Destination, int Source, int Temp);
@@ -425,6 +424,12 @@ void LoadIntoGeckoRegister(int Address, int Reg, int size);
 void StoreGeckoRegisterAt(int Address, int Reg, int size, int repeats = 0);
 void GeckoIf(u32 Address, int Comparison, int Value);
 void GeckoEndIf();
+// Opens a Gecko Embed. Note: Writes Embed address into PO!
+bool GeckoDataEmbedStart();
+// Closes the active Gecko Embed, padding for alingment to 0x8 bytes as necessary.
+// If AddressStoreLocation is provided, will additional write Embed Address to that location.
+// Also does a BAPO reset by default, which can be skipped using the provided argument.
+bool GeckoDataEmbedEnd(u32 AddressStoreLocation = ULONG_MAX, bool skipBAPOReset = 0);
 //searches for byte, elementOffset is distance between elements, ResultReg returns index if found, else -1
 //StartAddressReg ends with the address of the found element, or an address after the array
 void FindInArray(int ValueReg, int StartAddressReg, int numberOfElements, int elementOffset, int ResultReg, int TempReg);
@@ -432,9 +437,9 @@ void FindInArray(int ValueReg, int StartAddressReg, int numberOfElements, int el
 //StartAddressReg ends with the address of the found element, or an address after the array
 //ends when end marker is encountered
 void FindInTerminatedArray(int ValueReg, int StartAddressReg, int endMarker, int elementOffset, int ResultReg, int TempReg, int searchSize);
-void CallBrawlFunc(int Address);
+void CallBrawlFunc(int Address, int addressReg = 0);
 //r3 returns ptr
-void Allocate(int SizeReg, int Heap = 42);
+void Allocate(int SizeReg, int Heap = HeapType::MenuInstance);
 void AllocateIfNotExist(int SizeReg, int AddressReg, int EmptyVal);
 void Memmove(int DestReg, int SourceReg, int SizeReg);
 void SetRegs(int StartReg, vector<int> values);
@@ -515,6 +520,13 @@ void constrainFloatDynamic(int floatReg, int minFReg, int maxFReg);
 void modifyInstruction(int instructionReg, int addressReg);
 void IfInSSE(int reg1, int reg2);
 void IfNotInSSE(int reg1, int reg2);
+void GetHeapAddress(_heapCacheTable::CachedHeaps heapIndex, int destinationReg);
+void LoadWordFromHeapAddress(_heapCacheTable::CachedHeaps heapIndex, int loadDestinationReg, int addressDestinationReg, int offset);
+void StoreWordToHeapAddress(_heapCacheTable::CachedHeaps heapIndex, int sourceReg, int addressDestinationReg, int offset);
+void LoadHalfFromHeapAddress(_heapCacheTable::CachedHeaps heapIndex, int loadDestinationReg, int addressDestinationReg, int offset);
+void StoreHalfToHeapAddress(_heapCacheTable::CachedHeaps heapIndex, int sourceReg, int addressDestinationReg, int offset);
+void LoadByteFromHeapAddress(_heapCacheTable::CachedHeaps heapIndex, int loadDestinationReg, int addressDestinationReg, int offset);
+void StoreByteToHeapAddress(_heapCacheTable::CachedHeaps heapIndex, int sourceReg, int addressDestinationReg, int offset);
 
 void ABS(int DestReg, int SourceReg, int tempReg);
 void ADD(int DestReg, int SourceReg1, int SourceReg2, bool SetConditionReg = 0);
@@ -528,8 +540,8 @@ void ANDI(int DestReg, int SourceReg, int Immediate);
 void ANDIS(int DestReg, int SourceReg, int Immediate);
 void B(int JumpDist);
 void BA(int Address);
-void BC(int JumpDist, branchConditionAndConditionBit conditionIn);
-void BC(int JumpDist, int BranchCondition, int ConditionBit);
+void BC(int JumpDist, branchConditionAndConditionBit conditionIn, bool setLinkRegister = 0);
+void BC(int JumpDist, int BranchCondition, int ConditionBit, bool setLinkRegister = 0);
 void BCTR();
 void BCTRL();
 void BL(int JumpDist);
@@ -555,6 +567,7 @@ void FCTIW(int DestReg, int SourceReg, bool SetConditionReg = 0);
 void FCTIWZ(int DestReg, int SourceReg, bool SetConditionReg = 0);
 void FDIV(int FPDestReg, int FPSourceReg1, int FPSourceReg2, bool SetConditionReg = 0);
 void FDIVS(int FPDestReg, int FPSourceReg1, int FPSourceReg2, bool SetConditionReg = 0);
+void FMADD(int FPDestReg, int FPSourceReg1, int FPSourceReg2, int FPSourceReg3, bool SetConditionReg = 0);
 void FMR(int DestReg, int SourceReg, bool SetConditionReg = 0);
 void FMUL(int DestReg, int SourceReg1, int SourceReg2, bool SetConditionReg = 0);
 void FMULS(int DestReg, int SourceReg1, int SourceReg2, bool SetConditionReg = 0);
@@ -637,6 +650,7 @@ void STWUX(int SourceReg, int AddressReg1, int AddressReg2);
 void STWX(int SourceReg, int AddressReg1, int AddressReg2);
 //DestReg = SourceReg1 - SourceReg2
 void SUBF(int DestReg, int SourceReg1, int SourceReg2, bool SetConditionReg = 0);
+void SUBFIC(int DestReg, int SourceReg, int Immediate);
 void SYNC();
 void XOR(int DestReg, int SourceReg1, int SourceReg2, bool SetConditionReg = 0);
 void XORI(int DestReg, int SourceReg, int Immediate);
